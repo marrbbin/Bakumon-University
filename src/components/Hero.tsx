@@ -142,7 +142,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
                           </span>
                         </div>
                         <span className="text-xs text-slate-500 font-mono">
-                          @{user.username} {user.isSimulated && '· Sandbox Profile'}
+                          @{user.username}
                         </span>
                       </div>
                     </div>

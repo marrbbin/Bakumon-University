@@ -8,7 +8,7 @@ interface SupabaseSetupModalProps {
 }
 
 export const SupabaseSetupModal: React.FC<SupabaseSetupModalProps> = ({ isOpen, onClose }) => {
-  const { config, updateConfig, role, switchSimulatedRole } = useAuth();
+  const { config, updateConfig, role, user } = useAuth();
 
   const [supabaseUrl, setSupabaseUrl] = useState(config.supabaseUrl);
   const [supabaseAnonKey, setSupabaseAnonKey] = useState(config.supabaseAnonKey);
@@ -16,7 +16,7 @@ export const SupabaseSetupModal: React.FC<SupabaseSetupModalProps> = ({ isOpen, 
   const [studentRoleId, setStudentRoleId] = useState(config.studentRoleId);
   const [adminRoleId, setAdminRoleId] = useState(config.adminRoleId);
 
-  const [activeTab, setActiveTab] = useState<'config' | 'sql' | 'discord' | 'roles'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'sql' | 'discord' | 'security'>('config');
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -150,15 +150,15 @@ using (true);
           <button
             onClick={() => {
               playRetroSound('select');
-              setActiveTab('roles');
+              setActiveTab('security');
             }}
             className={`px-3.5 py-2 border-t-2 border-x-2 font-bold cursor-pointer ${
-              activeTab === 'roles'
+              activeTab === 'security'
                 ? 'bg-white border-slate-900 text-slate-900 -mb-[2px] pb-[10px]'
                 : 'bg-slate-100 border-transparent text-slate-600'
             }`}
           >
-            🎭 RBAC Role Switcher
+            🔒 Discord RBAC Security
           </button>
         </div>
 
@@ -322,68 +322,47 @@ using (true);
             </div>
           )}
 
-          {activeTab === 'roles' && (
+          {activeTab === 'security' && (
             <div className="space-y-4 font-mono">
               <div className="bg-slate-50 border-2 border-slate-900 p-4 space-y-2">
                 <h4 className="font-bold text-slate-900 text-sm">
-                  Role-Based Access Control (RBAC) Sandbox Tester
+                  Role-Based Access Control (RBAC) Security Architecture
                 </h4>
                 <p className="text-slate-600 text-xs">
-                  Easily toggle your active simulated session to test the interface as a <strong>Student</strong> (Student Terminal enrollment & duplicate prevention) or as an <strong>Admin</strong> (Pokédex Admin Roster with SELECT & DELETE capabilities).
+                  All visitors begin strictly in <strong>Guest Mode</strong> (unauthenticated). Roles cannot be chosen or toggled via arbitrary buttons. Access is exclusively granted via Discord OAuth verification:
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  onClick={() => switchSimulatedRole('student')}
-                  className={`p-4 border-2 border-slate-900 text-left cursor-pointer transition-all ${
-                    role === 'student'
-                      ? 'bg-emerald-100 shadow-[4px_4px_0_0_#0f172a] border-emerald-900'
-                      : 'bg-white hover:bg-slate-50 shadow-[2px_2px_0_0_#0f172a]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-pixel text-xs text-emerald-900">STUDENT ROLE</span>
-                    {role === 'student' && <span className="text-xs">✓ Active</span>}
+              <div className="space-y-3">
+                <div className="p-3.5 bg-white border-2 border-slate-900 space-y-1.5 shadow-[2px_2px_0_0_#0f172a]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-pixel text-xs text-slate-700">1. DEFAULT GUEST STATE</span>
+                    <span className="px-2 py-0.5 text-[10px] bg-slate-200 text-slate-800 font-bold">UNAUTHENTICATED</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    Access Student PC Terminal, submit enrollment, view Student Pass.
+                    Visitors see university lore, curriculum information, and a prominent "Login with Discord" call-to-action. The Student PC Terminal and Admin Pokédex Registry are locked.
                   </p>
-                </button>
+                </div>
 
-                <button
-                  onClick={() => switchSimulatedRole('admin')}
-                  className={`p-4 border-2 border-slate-900 text-left cursor-pointer transition-all ${
-                    role === 'admin'
-                      ? 'bg-amber-100 shadow-[4px_4px_0_0_#0f172a] border-amber-900'
-                      : 'bg-white hover:bg-slate-50 shadow-[2px_2px_0_0_#0f172a]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-pixel text-xs text-amber-900">ADMIN ROLE</span>
-                    {role === 'admin' && <span className="text-xs">✓ Active</span>}
+                <div className="p-3.5 bg-white border-2 border-slate-900 space-y-1.5 shadow-[2px_2px_0_0_#0f172a]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-pixel text-xs text-emerald-800">2. STUDENT VERIFICATION</span>
+                    <span className="px-2 py-0.5 text-[10px] bg-emerald-100 text-emerald-900 font-bold">DISCORD STUDENT ROLE</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    Access Pokédex Registry, query all students, execute SQL row DELETIONS.
+                    When logging in with Discord, the app verifies if the user's guild member profile in the Bakumon Discord server holds the <strong>Student Role ID ({studentRoleId || 'Not configured'})</strong>. If verified, the Student PC Terminal unlocks, allowing one-time enrollment.
                   </p>
-                </button>
+                </div>
 
-                <button
-                  onClick={() => switchSimulatedRole('guest')}
-                  className={`p-4 border-2 border-slate-900 text-left cursor-pointer transition-all ${
-                    role === 'guest'
-                      ? 'bg-slate-200 shadow-[4px_4px_0_0_#0f172a] border-slate-900'
-                      : 'bg-white hover:bg-slate-50 shadow-[2px_2px_0_0_#0f172a]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-pixel text-xs text-slate-700">GUEST / LOGGED OUT</span>
-                    {role === 'guest' && <span className="text-xs">✓ Active</span>}
+                <div className="p-3.5 bg-white border-2 border-slate-900 space-y-1.5 shadow-[2px_2px_0_0_#0f172a]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-pixel text-xs text-amber-900">3. ADMIN CLEARANCE</span>
+                    <span className="px-2 py-0.5 text-[10px] bg-amber-100 text-amber-900 font-bold">DISCORD ADMIN ROLE</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    Inspect locked terminal and registry prompts requiring Discord authentication.
+                    If the logged-in Discord member holds the <strong>Admin Role ID ({adminRoleId || 'Not configured'})</strong>, the administrative Pokédex Registry unlocks with full SELECT queries and programmatic SQL DELETE capabilities.
                   </p>
-                </button>
+                </div>
               </div>
             </div>
           )}
@@ -392,7 +371,7 @@ using (true);
         {/* Modal Footer */}
         <div className="flex items-center justify-between px-5 py-3 border-t-2 border-slate-900 bg-slate-50 font-mono text-xs">
           <span className="text-slate-500">
-            Active Role: <strong className="text-slate-900">{role.toUpperCase()}</strong>
+            Active Session: <strong className="text-slate-900">{user ? `@${user.username} (${role.toUpperCase()})` : 'GUEST (Not logged in)'}</strong>
           </span>
           <button
             onClick={() => {

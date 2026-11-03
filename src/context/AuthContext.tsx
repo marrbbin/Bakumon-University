@@ -8,8 +8,6 @@ import {
 import {
   fetchDiscordMemberRoles,
   determineEffectiveRole,
-  getSimulatedUser,
-  setSimulatedUser,
 } from '../services/supabaseService';
 import { playRetroSound } from '../utils/audio';
 
@@ -21,13 +19,13 @@ interface AuthContextType {
   config: SupabaseConfig;
   signInWithDiscord: () => Promise<void>;
   signOut: () => Promise<void>;
-  switchSimulatedRole: (role: UserRole) => void;
   updateConfig: (newConfig: Partial<SupabaseConfig>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // STRICT SECURITY DEFAULT: Every visitor begins as an unauthenticated 'guest'
   const [user, setUser] = useState<DiscordUser | null>(null);
   const [role, setRole] = useState<UserRole>('guest');
   const [isLoading, setIsLoading] = useState(true);
@@ -35,40 +33,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);
 
-  // Initialize auth state
+  // Initialize auth state directly from Supabase session
   useEffect(() => {
     let mounted = true;
+
+    // Purge any lingering simulated session keys from previous iterations
+    localStorage.removeItem('bakumon_simulated_user');
 
     const initAuth = async () => {
       setIsLoading(true);
 
-      // Check simulated user first
-      const simulated = getSimulatedUser();
-      if (simulated) {
-        if (mounted) {
-          setUser(simulated);
-          setRole(simulated.effectiveRole);
-          setIsLoading(false);
-        }
-        return;
-      }
-
       const supabase = getSupabaseClient();
       if (!supabase) {
-        // Fallback default: Start in Student mode for smooth instant onboarding
-        const defaultStudent: DiscordUser = {
-          id: 'mock-student-77',
-          username: 'ash_unova',
-          globalName: 'Ash Ketchum',
-          avatarUrl: 'https://cdn.discordapp.com/embed/avatars/0.png',
-          roles: [config.studentRoleId],
-          effectiveRole: 'student',
-          isSimulated: true,
-        };
+        // Without a configured Supabase backend, user is securely kept as Guest
         if (mounted) {
-          setUser(defaultStudent);
-          setRole('student');
-          setSimulatedUser(defaultStudent);
+          setUser(null);
+          setRole('guest');
           setIsLoading(false);
         }
         return;
@@ -89,15 +69,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             guildRoles = await fetchDiscordMemberRoles(providerToken, config.discordGuildId);
           }
 
-          // If no specific roles fetched from Discord API, check user metadata or assign student
-          if (guildRoles.length === 0) {
-            if (meta.roles && Array.isArray(meta.roles)) {
-              guildRoles = meta.roles;
-            } else {
-              guildRoles = [config.studentRoleId];
-            }
+          // If no external Discord API response, check roles claim if available
+          if (guildRoles.length === 0 && meta.roles && Array.isArray(meta.roles)) {
+            guildRoles = meta.roles;
           }
 
+          // Strictly determine role based on verified Discord Guild Role IDs
           const parsedRole = determineEffectiveRole(guildRoles, config);
 
           const discordUser: DiscordUser = {
@@ -106,7 +83,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             username: meta.user_name || meta.name || authUser.email?.split('@')[0] || 'DiscordTrainer',
             globalName: meta.full_name || meta.custom_claims?.global_name || meta.name,
             avatar: meta.avatar_url || meta.picture,
-            avatarUrl: meta.avatar_url || meta.picture || 'https://cdn.discordapp.com/embed/avatars/1.png',
+            avatarUrl: meta.avatar_url || meta.picture || 'https://cdn.discordapp.com/embed/avatars/0.png',
             roles: guildRoles,
             effectiveRole: parsedRole,
             isSimulated: false,
@@ -116,9 +93,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUser(discordUser);
             setRole(parsedRole);
           }
+        } else {
+          if (mounted) {
+            setUser(null);
+            setRole('guest');
+          }
         }
       } catch (err) {
         console.error('Error during Supabase session retrieval:', err);
+        if (mounted) {
+          setUser(null);
+          setRole('guest');
+        }
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -141,8 +127,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (providerToken && config.discordGuildId) {
             guildRoles = await fetchDiscordMemberRoles(providerToken, config.discordGuildId);
           }
-          if (guildRoles.length === 0) {
-            guildRoles = [config.studentRoleId];
+          if (guildRoles.length === 0 && meta.roles && Array.isArray(meta.roles)) {
+            guildRoles = meta.roles;
           }
 
           const parsedRole = determineEffectiveRole(guildRoles, config);
@@ -152,7 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             email: authUser.email,
             username: meta.user_name || meta.name || 'DiscordTrainer',
             globalName: meta.full_name || meta.name,
-            avatarUrl: meta.avatar_url || meta.picture || 'https://cdn.discordapp.com/embed/avatars/2.png',
+            avatarUrl: meta.avatar_url || meta.picture || 'https://cdn.discordapp.com/embed/avatars/0.png',
             roles: guildRoles,
             effectiveRole: parsedRole,
             isSimulated: false,
@@ -161,12 +147,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(discordUser);
           setRole(parsedRole);
         } else {
-          // If logged out from Supabase and not in simulated mode
-          const sim = getSimulatedUser();
-          if (!sim) {
-            setUser(null);
-            setRole('guest');
-          }
+          setUser(null);
+          setRole('guest');
         }
       });
       authListener = data.subscription;
@@ -183,19 +165,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const supabase = getSupabaseClient();
 
     if (!supabase) {
-      // If Supabase is not configured yet, notify user and switch into realistic authenticated student simulation
-      const simulated: DiscordUser = {
-        id: 'simulated-discord-' + Math.floor(1000 + Math.random() * 9000),
-        username: 'nawawa_trainer',
-        globalName: 'Nawawa Trainee',
-        avatarUrl: 'https://cdn.discordapp.com/embed/avatars/0.png',
-        roles: [config.studentRoleId],
-        effectiveRole: 'student',
-        isSimulated: true,
-      };
-      setUser(simulated);
-      setRole('student');
-      setSimulatedUser(simulated);
+      // Alert the administrator/user that Supabase needs to be connected
+      alert(
+        'Supabase & Discord OAuth are not yet configured!\n\nPlease click "⚡ Supabase" in the navbar to enter your Supabase URL, Anon Key, and Discord Role IDs.'
+      );
       return;
     }
 
@@ -210,6 +183,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error) {
         console.error('Supabase Discord OAuth error:', error);
+        alert(`Discord Authentication error: ${error.message}`);
       }
     } catch (err) {
       console.error('Failed to trigger Discord OAuth:', err);
@@ -222,36 +196,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (supabase) {
       await supabase.auth.signOut();
     }
-    setSimulatedUser(null);
     setUser(null);
     setRole('guest');
-  };
-
-  const switchSimulatedRole = (newRole: UserRole) => {
-    playRetroSound('confirm');
-    if (newRole === 'guest') {
-      setSimulatedUser(null);
-      setUser(null);
-      setRole('guest');
-      return;
-    }
-
-    const newUser: DiscordUser = {
-      id: newRole === 'admin' ? 'admin-professor-dk' : 'student-trainer-01',
-      username: newRole === 'admin' ? 'prof_dk_official' : 'unova_challenger',
-      globalName: newRole === 'admin' ? 'Professor DK (Faculty Head)' : 'Unova Challenger (Student)',
-      avatarUrl:
-        newRole === 'admin'
-          ? 'https://cdn.discordapp.com/embed/avatars/3.png'
-          : 'https://cdn.discordapp.com/embed/avatars/1.png',
-      roles: newRole === 'admin' ? [config.adminRoleId] : [config.studentRoleId],
-      effectiveRole: newRole,
-      isSimulated: true,
-    };
-
-    setUser(newUser);
-    setRole(newRole);
-    setSimulatedUser(newUser);
   };
 
   const updateConfig = (newConfig: Partial<SupabaseConfig>) => {
@@ -269,7 +215,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         config,
         signInWithDiscord,
         signOut,
-        switchSimulatedRole,
         updateConfig,
       }}
     >

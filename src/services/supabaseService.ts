@@ -2,7 +2,6 @@ import { Enrollee, ExperienceLevel, UserRole, DiscordUser } from '../types';
 import { getSupabaseClient, getSupabaseConfig } from './supabaseClient';
 
 const LOCAL_ENROLLEES_KEY = 'bakumon_supabase_enrollees_cache';
-const SIMULATED_USER_KEY = 'bakumon_simulated_user';
 
 export const DEFAULT_INITIAL_STUDENTS: Enrollee[] = [
   {
@@ -308,35 +307,16 @@ export const determineEffectiveRole = (
 ): UserRole => {
   if (!roleIds || roleIds.length === 0) return 'guest';
 
-  // Check if admin role matches
+  // Check if user has Discord Admin role
   if (config.adminRoleId && roleIds.includes(config.adminRoleId)) {
     return 'admin';
   }
 
-  // Check if student role matches
+  // Check if user has Discord Student role
   if (config.studentRoleId && roleIds.includes(config.studentRoleId)) {
     return 'student';
   }
 
-  return 'student'; // Default authenticated guild members to student if no explicit restriction
-};
-
-/**
- * Storage helpers for Simulated / Sandbox users
- */
-export const getSimulatedUser = (): DiscordUser | null => {
-  try {
-    const raw = localStorage.getItem(SIMULATED_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-export const setSimulatedUser = (user: DiscordUser | null) => {
-  if (!user) {
-    localStorage.removeItem(SIMULATED_USER_KEY);
-  } else {
-    localStorage.setItem(SIMULATED_USER_KEY, JSON.stringify(user));
-  }
+  // If authenticated on Discord but lacking the server role, they remain a guest
+  return 'guest';
 };

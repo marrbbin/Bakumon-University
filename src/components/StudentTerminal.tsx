@@ -195,7 +195,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                         Logged in as: <strong>@{user.username}</strong>
                       </p>
                       <p className="text-amber-800">
-                        Status: Guest / Unverified. Ask server admins to grant you the Student role, or use the dev role switcher above.
+                        Status: Guest / Unverified. Your Discord account has not been assigned the Student role in the Bakumon University Discord server yet.
                       </p>
                     </div>
                   )}

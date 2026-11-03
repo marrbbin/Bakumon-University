@@ -15,7 +15,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   onOpenSupabaseSetup,
   refreshTrigger,
 }) => {
-  const { user, role, signInWithDiscord, switchSimulatedRole } = useAuth();
+  const { user, role, signInWithDiscord, signOut } = useAuth();
 
   const [students, setStudents] = useState<Enrollee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,14 +150,17 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                   </button>
                 ) : (
                   <div className="space-y-3">
-                    <p className="text-xs font-mono text-slate-500">
-                      Current role: <span className="font-bold text-slate-900">{role.toUpperCase()}</span>
+                    <p className="text-xs font-mono text-slate-600 bg-white border border-slate-300 p-2.5 max-w-sm mx-auto">
+                      Logged in as <strong>@{user.username}</strong> ({role.toUpperCase()}). This Discord account has not been granted the faculty Admin role in the Bakumon Discord server.
                     </p>
                     <button
-                      onClick={() => switchSimulatedRole('admin')}
-                      className="px-5 py-2.5 font-pixel text-xs bg-amber-400 hover:bg-amber-500 text-slate-900 border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] cursor-pointer"
+                      onClick={async () => {
+                        await signOut();
+                        await signInWithDiscord();
+                      }}
+                      className="px-4 py-2 font-mono text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] cursor-pointer"
                     >
-                      ⚡ Switch to Admin Mode (Dev Preview)
+                      Sign In with Admin Account
                     </button>
                   </div>
                 )}
