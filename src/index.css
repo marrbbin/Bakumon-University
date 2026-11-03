@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-pixel: 'Press Start 2P', monospace;
+    --font-silkscreen: 'Silkscreen', monospace;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #fbfcfd;
+    color: #0f172a;
+    overflow-x: hidden;
+  }
+}
+
+.font-pixel {
+  font-family: var(--font-pixel);
+  letter-spacing: -0.04em;
+}
+
+.font-silkscreen {
+  font-family: var(--font-silkscreen);
+  letter-spacing: 0.02em;
+}
+
+/* Minimalist 16-bit Pixel Borders (Nintendo DS White Edition & Castelia Modernist) */
+.pixel-border-clean {
+  border: 2px solid #0f172a;
+  box-shadow: 3px 3px 0 0 #0f172a;
+}
+
+.pixel-border-clean-sm {
+  border: 2px solid #0f172a;
+  box-shadow: 2px 2px 0 0 #0f172a;
+}
+
+.pixel-border-red {
+  border: 2px solid #e11d48;
+  box-shadow: 3px 3px 0 0 #e11d48;
+}
+
+.pixel-border-light {
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 2px 4px 0 rgba(15, 23, 42, 0.04);
+}
+
+.pixel-btn-primary {
+  position: relative;
+  background-color: #0f172a;
+  color: #ffffff;
+  border: 2px solid #0f172a;
+  box-shadow: 3px 3px 0 0 #e11d48;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.pixel-btn-primary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 0 #e11d48;
+}
+
+.pixel-btn-primary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 #e11d48;
+}
+
+.pixel-btn-secondary {
+  position: relative;
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 2px solid #0f172a;
+  box-shadow: 3px 3px 0 0 #cbd5e1;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.pixel-btn-secondary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 0 #94a3b8;
+}
+
+.pixel-btn-secondary:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 #94a3b8;
+}
+
+.pixel-btn-accent {
+  position: relative;
+  background-color: #e11d48;
+  color: #ffffff;
+  border: 2px solid #0f172a;
+  box-shadow: 3px 3px 0 0 #0f172a;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.pixel-btn-accent:hover {
+  background-color: #be123c;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 0 #0f172a;
+}
+
+.pixel-btn-accent:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 0 #0f172a;
+}
+
+/* Subtle Minimalist Pixel Grid Pattern */
+.pixel-grid-pattern {
+  background-image: radial-gradient(#cbd5e1 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+}
+
+/* Idle floating animation for sprites */
+@keyframes idleFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float-idle {
+  animation: idleFloat 3.2s ease-in-out infinite;
+}
+
+/* Custom scrollbars for clean retro feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 0px;
+  border: 1px solid #94a3b8;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

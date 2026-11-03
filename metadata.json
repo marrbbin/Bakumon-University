@@ -1,0 +1,6 @@
+{
+  "name": "Bakumon University",
+  "description": "Recruitment and enrollment portal for Bakumon University, teaching Pokémon Gen 5 mechanics with Google Sheets backend integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

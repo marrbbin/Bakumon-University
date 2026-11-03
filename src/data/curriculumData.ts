@@ -1,0 +1,161 @@
+import { CurriculumSubject } from '../types';
+
+export const CAMPUS_ASSETS = {
+  logo: '/assets/aistudio/LOGO_Bakumon_HD_643d55b9.webp',
+  heroCampus: '/src/assets/images/minimal_campus_hero_1793705438026.jpg',
+  battling: '/src/assets/images/minimal_battling_art_1793705439651.jpg',
+  breeding: '/src/assets/images/minimal_breeding_art_1793705439211.jpg',
+  brewing: '/src/assets/images/minimal_brewing_art_1793705440573.jpg',
+  berryFarming: '/src/assets/images/minimal_berry_art_1793705439756.jpg',
+};
+
+export const CURRICULUM_SUBJECTS: CurriculumSubject[] = [
+  {
+    id: 'Battling',
+    title: 'Subject 1: Competitive Battling',
+    departmentName: 'Tactical Warfare & Synergy',
+    accentColor: '#e11d48',
+    borderColor: '#0f172a',
+    bgLight: '#fff1f2',
+    summary: 'Master tournament calculus, damage damage rolls, Effort Value (EV) distributions, Individual Value (IV) judges, and weather war synergies.',
+    instructor: 'Prof. Drayden & Marshall',
+    instructorTitle: 'League Arbiters & High Battle Tacticians',
+    image: CAMPUS_ASSETS.battling,
+    modules: [
+      {
+        code: 'BAT-101',
+        title: 'EV & IV Calculus: The 510 Ceiling',
+        description: 'Demystifying the 252/252/4 spread, power items (+4 EV per faint in Gen 5), Pokérus doubling mechanics, and Macho Brace math.',
+        keyTakeaway: '4 EVs yield +1 stat point at Lv. 100; maximum 252 EVs in a single stat.',
+      },
+      {
+        code: 'BAT-201',
+        title: 'Weather Syndicates & Speed Tiers',
+        description: 'Analyzing permanent Gen 5 weather battles: Drizzle Politoed, Drought Ninetales, Sand Stream Tyranitar, and Snow Warning Abomasnow.',
+        keyTakeaway: 'Control the skies to dictate switch tempo and double Swift Swim/Chlorophyll speed.',
+      },
+      {
+        code: 'BAT-301',
+        title: 'Pivots, Hazards & Team Archetypes',
+        description: 'Stealth Rock residual damage thresholds, Volt-Turn momentum cores (Rotom-W + Scizor), and entry hazard denial with Taunt and Magic Bounce.',
+        keyTakeaway: 'Stealth Rock inflicts up to 50% max HP damage on 4x weak typings upon entry.',
+      },
+    ],
+    learningOutcomes: [
+      'Calculate precise speed benchmarks to outpace prominent threats like Choice Scarf Garchomp and Keldeo.',
+      'Construct a balanced 6-monster roster with dedicated Physical Wall, Special Wall, Cleaner, and Hazard Setter.',
+      'Optimize item selection: Focus Sash vs. Life Orb recoil vs. Leftovers passive regeneration.',
+    ],
+  },
+  {
+    id: 'Breeding',
+    title: 'Subject 2: Breeding & Genetics',
+    departmentName: 'Hereditary Traits & Daycare',
+    accentColor: '#0284c7',
+    borderColor: '#0f172a',
+    bgLight: '#f0f9ff',
+    summary: 'Unlock the mysteries of Egg Groups, 100% nature passing via Everstone, IV inheritance chains, Hidden Ability propagation, and Masuda Method shiny odds.',
+    instructor: 'Route 3 Daycare Keepers',
+    instructorTitle: 'Master Breeders of the Daycare Reserve',
+    image: CAMPUS_ASSETS.breeding,
+    modules: [
+      {
+        code: 'BRD-101',
+        title: 'Egg Group Kinship & Ditto Genetics',
+        description: 'Understanding compatible monster groups (Field, Dragon, Amorphous, Mineral, Water 1/2/3) and universal Ditto pairing mechanics.',
+        keyTakeaway: 'Pokémon within the same Egg Group can produce offspring of the female species.',
+      },
+      {
+        code: 'BRD-201',
+        title: 'Nature Anchoring with Everstone',
+        description: 'Guaranteed 100% nature inheritance when either parent holds an Everstone (standardized in Gen 5 Unova Black 2 & White 2).',
+        keyTakeaway: 'Pair Jolly (+Spe, -SpA) or Timid (+Spe, -Atk) with an Everstone to never waste an egg cycle.',
+      },
+      {
+        code: 'BRD-301',
+        title: 'IV Inheritance & Destiny Knot Foundations',
+        description: 'Tracing 3 random IVs inherited from parents in classic Gen 5 mechanics, Power Item stat locks (Power Bracer for Attack, Power Anklet for Speed).',
+        keyTakeaway: 'Power items guarantee 1 specific 31 IV stat is inherited directly from the holding parent.',
+      },
+    ],
+    learningOutcomes: [
+      'Pass down exclusive Egg Moves like Dragon Dance to Scrafty or Close Combat to Arcanine.',
+      'Hatch 5IV competitive-ready companions in under 20 egg batches using Flame Body incubators.',
+      'Execute the Masuda Method (1/1365 shiny probability in Gen 5) using foreign region parent tags.',
+    ],
+  },
+  {
+    id: 'Brewing',
+    title: 'Subject 3: Item Brewing & Alchemy',
+    departmentName: 'Apothecary & Medicine Synthesis',
+    accentColor: '#9333ea',
+    borderColor: '#0f172a',
+    bgLight: '#faf5ff',
+    summary: 'Synthesize stat-enhancing vitamins (Carbos, Protein, Calcium), concoct restorative remedies from wild herbs, and craft held combat items.',
+    instructor: 'Castelia Guild Herbalists',
+    instructorTitle: 'Chief Alchemists of Unova',
+    image: CAMPUS_ASSETS.brewing,
+    modules: [
+      {
+        code: 'BRW-101',
+        title: 'Vitamin Alchemy: Instant EV Loading',
+        description: 'Formulating Protein (+10 Atk EV), Iron (+10 Def EV), Carbos (+10 Spe EV), and Calcium (+10 SpA EV) up to the 100 EV cap threshold.',
+        keyTakeaway: 'Vitamins immediately infuse 10 Effort Values, shortening training cycles by over 70%.',
+      },
+      {
+        code: 'BRW-201',
+        title: 'Herbal Medicine & Friendship Offsets',
+        description: 'Compounding Energy Powder, Revival Herb, and Heal Powder at fraction of PokéMart cost while mitigating companion friendship penalties.',
+        keyTakeaway: 'Revival Herb restores 100% HP from faint, making it the most potent field emergency remedy.',
+      },
+      {
+        code: 'BRW-301',
+        title: 'X-Item Battle Catalyst Distillation',
+        description: 'Synthesizing X-Attack, X-Speed, and Dire Hit with Gen 5 +2 stage boost potency in tactical turn rotations.',
+        keyTakeaway: 'A single synthesized X-Speed instantly doubles your monster\'s active battle speed.',
+      },
+    ],
+    learningOutcomes: [
+      'Extract pure essences from Stardust, Big Mushrooms, and Pearl fragments found in Relic Castle.',
+      'Formulate specialized PP Ups and Elixirs for sustained competitive gym challenges.',
+      'Master the synthesis recipes for battle held items like Expert Belt and Focus Band.',
+    ],
+  },
+  {
+    id: 'Berry Farming',
+    title: 'Subject 4: Berry Farming & Horticulture',
+    departmentName: 'Agricultural Science & Botanical Yields',
+    accentColor: '#16a34a',
+    borderColor: '#0f172a',
+    bgLight: '#f0fdf4',
+    summary: 'Cultivate medicinal berries, manage soil moisture states, apply high-yield mulches, cross-pollinate mutant breeds, and optimize harvest bushels.',
+    instructor: 'Abundant Shrine Cultivators',
+    instructorTitle: 'Master Agronomists of the Unova Shrine',
+    image: CAMPUS_ASSETS.berryFarming,
+    modules: [
+      {
+        code: 'BRY-101',
+        title: 'Soil Hydration & Growth Stages',
+        description: 'The 4 fundamental phases: Seed, Sprout, Bloom, and Berry. Managing the Wailmer Pail watering cycle to avoid dry soil yield penalties.',
+        keyTakeaway: 'Keeping loam continuously moist yields up to 5x maximum berry harvest count.',
+      },
+      {
+        code: 'BRY-201',
+        title: 'Mulch Chemistry & Accelerators',
+        description: 'Formulating Damp Mulch (extends moisture duration), Growth Mulch (reduces maturation time by 25%), and Gooey Mulch (regrows extra cycles).',
+        keyTakeaway: 'Growth Mulch allows fast turnaround on essential pinch-health Sitrus Berries.',
+      },
+      {
+        code: 'BRY-301',
+        title: 'Pinch & Type-Resist Berries',
+        description: 'Cultivating strategic competitive berries: Lum Berry (full status cure), Sitrus Berry (25% instant restore), and Yache Berry (reduces 4x Ice damage).',
+        keyTakeaway: 'Lum Berry automatically cures paralysis, burn, or sleep the instant it is inflicted.',
+      },
+    ],
+    learningOutcomes: [
+      'Implement an automated crop rotation ensuring 100+ Lum & Sitrus Berries harvested per week.',
+      'Produce rare EV-reducing berries (Pomeg, Kelpsy, Qualot, Hondew, Grepa, Tamato) for stat resets.',
+      'Cross-pollinate wild specimens to discover hybrid berry strains with unique defensive qualities.',
+    ],
+  },
+];
