@@ -47,17 +47,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [config, setConfig] = useState<SupabaseConfig>(getSupabaseConfig());
 
+  const roleRef = React.useRef<UserRole>('guest');
+  useEffect(() => {
+    roleRef.current = role;
+  }, [role]);
+
   const isConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);
 
   // Helper to resolve role for a given user & session
   const resolveRole = async (
     userId: string,
     providerToken: string | null | undefined,
-    meta: any
+    meta: any,
+    currentRole: UserRole
   ): Promise<{ resolvedRole: UserRole; roles: string[] }> => {
     // 1. Check if user already holds a persisted verified role in localStorage
     try {
-      const persisted = localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${userId}`) as UserRole;
+      const persistedUser = localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${userId}`) as UserRole;
+      const persistedDiscord = meta?.provider_id
+        ? (localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.provider_id}`) as UserRole)
+        : null;
+      const persistedSub = meta?.sub
+        ? (localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.sub}`) as UserRole)
+        : null;
+      const persistedGlobal = localStorage.getItem('bakumon_verified_role_global') as UserRole;
+
+      const persisted =
+        persistedUser ||
+        persistedDiscord ||
+        persistedSub ||
+        (currentRole === 'admin' ? 'admin' : null) ||
+        persistedGlobal;
+
       if (persisted && (persisted === 'admin' || persisted === 'student')) {
         return { resolvedRole: persisted, roles: meta?.roles || [] };
       }
@@ -73,18 +94,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       guildRoles = await fetchDiscordMemberRoles(activeToken, config.discordGuildId);
     }
 
-    // 3. Fallback to token claims
+    // 3. Fallback to token claims or metadata
     if (guildRoles.length === 0 && meta?.roles && Array.isArray(meta.roles)) {
       guildRoles = meta.roles;
     }
 
-    // 4. Calculate effective role based on role IDs
-    const parsedRole = determineEffectiveRole(guildRoles, config);
+    // 4. Calculate effective role based on role IDs and names (checks '1567172563585597540' and 'Teachers')
+    let parsedRole = determineEffectiveRole(guildRoles, config, meta);
 
-    // If successfully resolved to teacher/admin or student, cache it
+    // CRITICAL: If the user was already verified as Teacher/Admin, never demote them to guest!
+    if (parsedRole === 'guest' && currentRole === 'admin') {
+      parsedRole = 'admin';
+    }
+
+    // If successfully resolved to teacher/admin or student, cache it in all identifiers
     if (parsedRole !== 'guest') {
       try {
         localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${userId}`, parsedRole);
+        localStorage.setItem('bakumon_verified_role_global', parsedRole);
+        if (meta?.provider_id) {
+          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.provider_id}`, parsedRole);
+        }
+        if (meta?.sub) {
+          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.sub}`, parsedRole);
+        }
       } catch {
         // Ignore
       }
@@ -105,6 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (mounted) {
           setUser(null);
           setRole('guest');
+          roleRef.current = 'guest';
           setIsLoading(false);
         }
         return;
@@ -131,8 +165,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { resolvedRole, roles } = await resolveRole(
             authUser.id,
             session.provider_token,
-            meta
+            meta,
+            roleRef.current
           );
+
+          roleRef.current = resolvedRole;
 
           const roleTitle =
             resolvedRole === 'admin'
@@ -159,14 +196,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setRole(resolvedRole);
           }
         } else {
-          if (mounted) {
+          if (mounted && roleRef.current === 'guest') {
             setUser(null);
             setRole('guest');
           }
         }
       } catch (err) {
         console.error('Error during Supabase session retrieval:', err);
-        if (mounted) {
+        if (mounted && roleRef.current === 'guest') {
           setUser(null);
           setRole('guest');
         }
@@ -182,7 +219,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let authListener: any = null;
 
     if (supabase) {
-      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // Handle explicit sign out
+        if (event === 'SIGNED_OUT') {
+          try {
+            localStorage.removeItem(STORAGE_KEYS.PROVIDER_TOKEN);
+            localStorage.removeItem('bakumon_verified_role_global');
+            if (user?.id) {
+              localStorage.removeItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`);
+            }
+          } catch {
+            // Ignore
+          }
+          roleRef.current = 'guest';
+          setUser(null);
+          setRole('guest');
+          return;
+        }
+
         if (session && session.user) {
           const authUser = session.user;
           const meta = authUser.user_metadata || {};
@@ -198,8 +252,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { resolvedRole, roles } = await resolveRole(
             authUser.id,
             session.provider_token,
-            meta
+            meta,
+            roleRef.current
           );
+
+          roleRef.current = resolvedRole;
 
           const roleTitle =
             resolvedRole === 'admin'
@@ -222,9 +279,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           setUser(discordUser);
           setRole(resolvedRole);
-        } else {
-          setUser(null);
-          setRole('guest');
+        } else if (event !== 'INITIAL_SESSION') {
+          // Only clear if not in the initial token parsing window
+          if (roleRef.current === 'guest') {
+            setUser(null);
+            setRole('guest');
+          }
         }
       });
       authListener = data.subscription;
@@ -274,12 +334,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Clean up stored session tokens
     try {
       localStorage.removeItem(STORAGE_KEYS.PROVIDER_TOKEN);
+      localStorage.removeItem('bakumon_verified_role_global');
       if (user?.id) {
         localStorage.removeItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`);
       }
     } catch {
       // Ignore
     }
+    roleRef.current = 'guest';
     setUser(null);
     setRole('guest');
   };
@@ -300,7 +362,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     if (validKeys.includes(clean)) {
       playRetroSound('confirm');
+      roleRef.current = 'admin';
       setRole('admin');
+      try {
+        localStorage.setItem('bakumon_verified_role_global', 'admin');
+        if (user?.id) {
+          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, 'admin');
+        }
+      } catch {
+        // Ignore
+      }
 
       if (user) {
         const updated: DiscordUser = {
@@ -309,11 +380,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           roleTitle: 'Teacher',
         };
         setUser(updated);
-        try {
-          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, 'admin');
-        } catch {
-          // Ignore
-        }
       }
       return true;
     }
@@ -323,7 +389,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const setUserRole = (newRole: UserRole) => {
+    roleRef.current = newRole;
     setRole(newRole);
+    try {
+      if (newRole !== 'guest') {
+        localStorage.setItem('bakumon_verified_role_global', newRole);
+      } else {
+        localStorage.removeItem('bakumon_verified_role_global');
+      }
+      if (user?.id) {
+        localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, newRole);
+      }
+    } catch {
+      // Ignore
+    }
     if (user) {
       const updated: DiscordUser = {
         ...user,
@@ -331,11 +410,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         roleTitle: newRole === 'admin' ? 'Teacher' : newRole === 'student' ? 'Student' : 'Guest',
       };
       setUser(updated);
-      try {
-        localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, newRole);
-      } catch {
-        // Ignore
-      }
     }
   };
 

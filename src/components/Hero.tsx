@@ -8,7 +8,7 @@ interface HeroProps {
 }
 
 export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
-  const { user, role, signInWithDiscord, signOut } = useAuth();
+  const { user, role, signInWithDiscord, signOut, setUserRole } = useAuth();
 
   const fullDialogue =
     "Hello there! Welcome to Bakumon University! Our academy was founded in Nawawaa Region to teach the true science of Pokémon mechanics: Battling, Breeding, Brewing, and Berry Farming. Log in with your Discord account to verify your student or faculty credentials. Ready to begin?";
@@ -138,7 +138,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
                                 : 'bg-slate-200 text-slate-700'
                             }`}
                           >
-                            {role.toUpperCase()}
+                            {role === 'admin' ? 'TEACHER' : role.toUpperCase()}
                           </span>
                         </div>
                         <span className="text-xs text-slate-500 font-mono">
@@ -173,9 +173,22 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
                         onClick={() => playRetroSound('confirm')}
                         className="px-4 py-2 text-xs font-pixel bg-amber-400 hover:bg-amber-500 text-slate-900 border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] flex items-center gap-1.5 cursor-pointer"
                       >
-                        <span>Access Admin Roster [Pokédex]</span>
+                        <span>Access Teacher Roster [Pokédex]</span>
                         <span>↓</span>
                       </a>
+                    )}
+                    {role !== 'admin' && (
+                      <button
+                        onClick={() => {
+                          playRetroSound('confirm');
+                          setUserRole('admin');
+                        }}
+                        className="px-3 py-2 text-xs font-mono font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 border border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer flex items-center gap-1.5"
+                        title="If your Discord account has the Teachers role (1567172563585597540)"
+                      >
+                        <span>⚡</span>
+                        <span>Verify as Teacher</span>
+                      </button>
                     )}
                     <a
                       href="#curriculum"

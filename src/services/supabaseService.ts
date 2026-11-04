@@ -362,13 +362,29 @@ export const resetAllEnrolleesToDefault = async (): Promise<Enrollee[]> => {
 };
 
 /**
- * Fetch Discord member roles using Discord OAuth provider_token
+ * Fetch Discord member roles using Discord OAuth provider_token.
+ * Automatically caches successfully retrieved roles so that subsequent
+ * auth token refresh events or Discord API rate-limiting don't wipe out the user's role.
  */
 export const fetchDiscordMemberRoles = async (
   providerToken: string,
   guildId: string
 ): Promise<string[]> => {
-  if (!providerToken || !guildId) return [];
+  const CACHE_KEY = `bakumon_cached_discord_roles_${guildId}`;
+
+  if (!providerToken || !guildId) {
+    // Check if we have cached roles from this session
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  }
 
   try {
     const res = await fetch(`https://discord.com/api/v10/users/@me/guilds/${guildId}/member`, {
@@ -378,51 +394,119 @@ export const fetchDiscordMemberRoles = async (
     });
 
     if (!res.ok) {
-      console.warn('Discord API returned status:', res.status);
+      console.warn('Discord API returned status:', res.status, res.statusText);
+      // Fall back to cached roles if available
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {
+        // Ignore
+      }
       return [];
     }
 
     const data = await res.json();
-    return Array.isArray(data.roles) ? data.roles : [];
+    const roles: string[] = Array.isArray(data.roles) ? data.roles : [];
+
+    if (roles.length > 0) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(roles));
+      } catch {
+        // Ignore
+      }
+    }
+
+    return roles;
   } catch (err) {
     console.error('Failed to fetch Discord guild member roles:', err);
+    // Fall back to cached roles on network failure
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // Ignore
+    }
     return [];
   }
 };
 
 /**
  * Determine effective role (Teacher/Admin, Student, Guest) from Discord roles list.
- * Note: The Teacher role in the Discord server is ID 1567172563585597540,
- * which grants the Teacher/Faculty administrative clearance ('admin').
+ * Note: The Teacher role in the Discord server is named "Teachers" with ID:
+ * 1567172563585597540, which grants the Teacher/Faculty administrative clearance ('admin').
+ *
+ * This checks both raw Discord Snowflake IDs and role name strings (case-insensitive).
  */
 export const determineEffectiveRole = (
-  roleIds: string[],
-  config = getSupabaseConfig()
+  roleIdsOrNames: string[],
+  config = getSupabaseConfig(),
+  userMetadata?: any
 ): UserRole => {
-  if (!roleIds || roleIds.length === 0) return 'guest';
+  const list = [...(roleIdsOrNames || [])];
 
-  // Check if user has Discord Teachers / Faculty / Admin role
-  const teacherRoleIds = [
-    config.adminRoleId,
-    config.teacherRoleId,
+  // Also harvest any roles stored in userMetadata claims
+  if (userMetadata) {
+    if (Array.isArray(userMetadata.roles)) {
+      list.push(...userMetadata.roles);
+    }
+    if (Array.isArray(userMetadata.custom_claims?.roles)) {
+      list.push(...userMetadata.custom_claims.roles);
+    }
+    if (typeof userMetadata.role === 'string') {
+      list.push(userMetadata.role);
+    }
+  }
+
+  if (list.length === 0) return 'guest';
+
+  // Normalize all candidate strings to lowercase strings
+  const normalizedList = list.map((item) => String(item).trim().toLowerCase());
+
+  // Teacher / Admin identifiers (IDs & names)
+  const teacherIdentifiers = [
     '1567172563585597540',
-  ].filter(Boolean);
+    config.adminRoleId?.toLowerCase(),
+    config.teacherRoleId?.toLowerCase(),
+    'teachers',
+    'teacher',
+    'admin',
+    'administrator',
+    'faculty',
+    'professor',
+  ].filter(Boolean) as string[];
 
-  if (teacherRoleIds.some((id) => roleIds.includes(id as string))) {
+  const isTeacher = teacherIdentifiers.some((target) =>
+    normalizedList.includes(target)
+  );
+
+  if (isTeacher) {
     return 'admin'; // Grants Teacher/Faculty administrative clearance
   }
 
-  // Check if user has Discord Student role
-  const studentRoleIds = [
-    config.studentRoleId,
+  // Student identifiers (IDs & names)
+  const studentIdentifiers = [
     '1567172479808700536',
-  ].filter(Boolean);
+    config.studentRoleId?.toLowerCase(),
+    'students',
+    'student',
+    'trainer',
+    'member',
+  ].filter(Boolean) as string[];
 
-  if (studentRoleIds.some((id) => roleIds.includes(id as string))) {
+  const isStudent = studentIdentifiers.some((target) =>
+    normalizedList.includes(target)
+  );
+
+  if (isStudent) {
     return 'student';
   }
 
-  // If authenticated on Discord but lacking the server role, they remain a guest
   return 'guest';
 };
 

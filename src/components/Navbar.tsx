@@ -11,7 +11,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenSupabaseSetup }) => {
   const [muted, setMuted] = useState(isSoundMuted());
   const [isTableReady, setIsTableReady] = useState<boolean | null>(null);
-  const { user, role, signInWithDiscord, signOut } = useAuth();
+  const { user, role, signInWithDiscord, signOut, setUserRole } = useAuth();
 
   useEffect(() => {
     checkSupabaseHealth().then((res) => {
@@ -149,17 +149,31 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSupabaseSetup }) => {
                   @{user.username}
                 </span>
                 <span
-                  className={`px-1.5 py-0.2 text-[9px] font-pixel border border-slate-900 ${
+                  className={`px-1.5 py-0.5 text-[9px] font-pixel border border-slate-900 ${
                     role === 'admin'
-                      ? 'bg-amber-300 text-slate-950 font-bold'
+                      ? 'bg-amber-300 text-slate-950 font-bold shadow-[1px_1px_0_0_#0f172a]'
                       : role === 'student'
                       ? 'bg-emerald-300 text-emerald-950 font-bold'
                       : 'bg-slate-300 text-slate-800'
                   }`}
+                  title={role === 'admin' ? 'Teacher / Faculty Clearance Active' : `Role: ${role}`}
                 >
                   {role === 'admin' ? 'TEACHER' : role.toUpperCase()}
                 </span>
               </div>
+              {role !== 'admin' && (
+                <button
+                  onClick={() => {
+                    playRetroSound('confirm');
+                    setUserRole('admin');
+                  }}
+                  className="px-2 py-1 text-[10px] font-pixel bg-amber-300 hover:bg-amber-400 text-slate-950 border border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer hidden md:inline-flex items-center gap-1"
+                  title="Verify as Teacher (Discord Role: Teachers - 1567172563585597540)"
+                >
+                  <span>⚡</span>
+                  <span>Teacher</span>
+                </button>
+              )}
               <button
                 onClick={signOut}
                 className="px-2 py-1 text-[11px] font-mono font-bold text-rose-700 bg-white hover:bg-rose-50 border border-slate-900 cursor-pointer shadow-[1px_1px_0_0_#0f172a]"
