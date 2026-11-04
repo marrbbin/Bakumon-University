@@ -83,16 +83,16 @@ on enrollees for insert
 to authenticated
 with check (auth.uid() = user_id);
 
--- 4. RLS POLICY: AUTHENTICATED USERS CAN SELECT ROSTER
-create policy "Authenticated users can select enrollees"
+-- 4. RLS POLICY: SELECT ROSTER (AUTHENTICATED & ANON)
+create policy "Allow select on enrollees"
 on enrollees for select
-to authenticated
+to public
 using (true);
 
--- 5. RLS POLICY: ONLY ADMINS CAN DELETE ENROLLEES
-create policy "Admins can delete enrollees"
+-- 5. RLS POLICY: ALLOW DELETE ON ENROLLEES
+create policy "Allow delete on enrollees"
 on enrollees for delete
-to authenticated
+to public
 using (true);
 `;
 

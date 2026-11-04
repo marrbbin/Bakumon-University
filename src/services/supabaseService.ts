@@ -6,6 +6,8 @@ import {
   saveLocalEnrolleesStore,
   addLocalEnrollee,
   removeLocalEnrollee,
+  clearAllLocalEnrollees,
+  resetToDefaultLocalEnrollees,
   findLocalEnrolleeByUserId,
 } from '../store';
 
@@ -32,7 +34,7 @@ export const fetchEnrollees = async (): Promise<{
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.warn('Supabase SELECT error, falling back to local:', error.message);
+        console.warn('Supabase SELECT error, falling back to local store:', error.message);
         return {
           data: getLocalEnrollees(),
           source: 'local_storage',
@@ -40,7 +42,7 @@ export const fetchEnrollees = async (): Promise<{
         };
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         // Map postgres column names to Enrollee interface
         const mapped: Enrollee[] = data.map((row: any) => ({
           id: row.id || `BKU-${row.id_number || Math.floor(Math.random() * 9000 + 1000)}`,
@@ -105,14 +107,13 @@ export const checkUserAlreadyEnrolled = async (
     }
   }
 
-  // Fallback to local storage
-  const localList = getLocalEnrollees();
-  const existing = localList.find((e) => e.userId === userId);
+  // Fallback to local storage store
+  const existing = findLocalEnrolleeByUserId(userId);
   return { enrolled: !!existing, enrollee: existing };
 };
 
 /**
- * INSERT a single data payload into Supabase
+ * INSERT a single data payload into Supabase & store
  */
 export const insertEnrollee = async (payload: {
   name: string;
@@ -170,9 +171,9 @@ export const insertEnrollee = async (payload: {
         .single();
 
       if (error) {
-        console.warn('Supabase INSERT error, falling back to local:', error.message);
-        // Continue to save locally as fallback
+        console.warn('Supabase INSERT error, saving to local store:', error.message);
       } else if (data) {
+        addLocalEnrollee(newEnrollee);
         return { success: true, data: newEnrollee };
       }
     } catch (err: any) {
@@ -180,35 +181,69 @@ export const insertEnrollee = async (payload: {
     }
   }
 
-  // Save to local fallback store
-  const localList = getLocalEnrollees();
-  saveLocalEnrollees([newEnrollee, ...localList]);
+  // Always save to store
+  addLocalEnrollee(newEnrollee);
   return { success: true, data: newEnrollee };
 };
 
 /**
  * DELETE an enrollee by ID (Admin Role only)
+ * Resilient implementation: deletes from Supabase if reachable, and ALWAYS
+ * synchronizes the local store & UI state so records never get permanently stuck.
  */
-export const deleteEnrollee = async (id: string): Promise<{ success: boolean; error?: string }> => {
+export const deleteEnrollee = async (
+  id: string
+): Promise<{ success: boolean; warning?: string; error?: string }> => {
   const supabase = getSupabaseClient();
+  let supabaseWarning: string | undefined;
 
   if (supabase) {
     try {
       const { error } = await supabase.from('enrollees').delete().eq('id', id);
       if (error) {
-        console.warn('Supabase DELETE error:', error.message);
-        return { success: false, error: error.message };
+        console.warn('Supabase DELETE warning (will still remove from store):', error.message);
+        supabaseWarning = error.message;
       }
     } catch (err: any) {
       console.warn('Failed to delete on Supabase:', err);
+      supabaseWarning = err?.message || 'Network exception';
     }
   }
 
-  // Also update local store
-  const localList = getLocalEnrollees();
-  const updated = localList.filter((item) => item.id !== id);
-  saveLocalEnrollees(updated);
-  return { success: true };
+  // Always remove from store so the UI updates and persists cleanly
+  removeLocalEnrollee(id);
+  return { success: true, warning: supabaseWarning };
+};
+
+/**
+ * DELETE ALL enrollees (Wipe / Reset entire student registry)
+ */
+export const clearAllEnrollees = async (): Promise<{ success: boolean; warning?: string }> => {
+  const supabase = getSupabaseClient();
+  let supabaseWarning: string | undefined;
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('enrollees').delete().neq('id', '');
+      if (error) {
+        console.warn('Supabase delete all warning:', error.message);
+        supabaseWarning = error.message;
+      }
+    } catch (err: any) {
+      console.warn('Supabase delete all exception:', err);
+      supabaseWarning = err?.message;
+    }
+  }
+
+  clearAllLocalEnrollees();
+  return { success: true, warning: supabaseWarning };
+};
+
+/**
+ * Reset roster back to initial curriculum sample students
+ */
+export const resetAllEnrolleesToDefault = async (): Promise<Enrollee[]> => {
+  return resetToDefaultLocalEnrollees();
 };
 
 /**

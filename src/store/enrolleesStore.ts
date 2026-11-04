@@ -107,6 +107,30 @@ export const removeLocalEnrollee = (id: string): Enrollee[] => {
 };
 
 /**
+ * Clear all enrollees from the local store (empty database).
+ */
+export const clearAllLocalEnrollees = (): Enrollee[] => {
+  try {
+    localStorage.setItem(LOCAL_ENROLLEES_STORE_KEY, JSON.stringify([]));
+  } catch (err) {
+    console.error('Failed to clear local enrollees store:', err);
+  }
+  return [];
+};
+
+/**
+ * Reset local store back to default initial students.
+ */
+export const resetToDefaultLocalEnrollees = (): Enrollee[] => {
+  try {
+    localStorage.setItem(LOCAL_ENROLLEES_STORE_KEY, JSON.stringify(DEFAULT_INITIAL_STUDENTS));
+  } catch (err) {
+    console.error('Failed to reset local enrollees store:', err);
+  }
+  return DEFAULT_INITIAL_STUDENTS;
+};
+
+/**
  * Check if a student with the specified userId is already in the store.
  */
 export const findLocalEnrolleeByUserId = (userId: string): Enrollee | undefined => {

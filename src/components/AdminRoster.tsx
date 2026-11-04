@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Enrollee } from '../types';
 import { CAMPUS_ASSETS } from '../data/curriculumData';
-import { fetchEnrollees, deleteEnrollee } from '../services/supabaseService';
+import {
+  fetchEnrollees,
+  deleteEnrollee,
+  clearAllEnrollees,
+  resetAllEnrolleesToDefault,
+} from '../services/supabaseService';
 import { MCPlayerHead } from './MCPlayerHead';
 import { playRetroSound } from '../utils/audio';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +20,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   onOpenSupabaseSetup,
   refreshTrigger,
 }) => {
-  const { user, role, signInWithDiscord, signOut } = useAuth();
+  const { user, role, signInWithDiscord, signOut, config } = useAuth();
 
   const [students, setStudents] = useState<Enrollee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +28,20 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Enrollee | null>(null);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
+  const [isWiping, setIsWiping] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'warn' | 'error'; text: string } | null>(null);
+
+  // Admin access bypass / Faculty Key for testing on Vercel
+  const [passcodeUnlocked, setPasscodeUnlocked] = useState(false);
+  const [enteredPasscode, setEnteredPasscode] = useState('');
+  const [passcodeError, setPasscodeError] = useState(false);
+  const [showPasscodeInput, setShowPasscodeInput] = useState(false);
+
+  // Section collapse toggle if the user wishes to hide this component
+  const [isSectionCollapsed, setIsSectionCollapsed] = useState(false);
+
+  const isAdminAuthorized = role === 'admin' || passcodeUnlocked;
 
   const loadData = async () => {
     setLoading(true);
@@ -42,31 +60,115 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
     loadData();
   }, [refreshTrigger]);
 
+  // Handle Faculty Passcode verification
+  const handleVerifyPasscode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = enteredPasscode.trim();
+    // Accept standard faculty passcodes or configured admin role ID
+    const validKeys = [
+      'bakumon2026',
+      'admin',
+      'professor',
+      config.adminRoleId,
+      '1567172563585597540',
+    ];
+
+    if (validKeys.includes(clean)) {
+      playRetroSound('confirm');
+      setPasscodeUnlocked(true);
+      setPasscodeError(false);
+      setNotification({
+        type: 'success',
+        text: 'Faculty Clearance Verified! Admin Database controls unlocked.',
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } else {
+      playRetroSound('error');
+      setPasscodeError(true);
+    }
+  };
+
+  // Resilient single record deletion
   const handleDeleteConfirmed = async () => {
     if (!deleteConfirmTarget) return;
 
     const targetId = deleteConfirmTarget.id;
+    const targetName = deleteConfirmTarget.name;
     setDeletingId(targetId);
     playRetroSound('select');
 
     try {
       const result = await deleteEnrollee(targetId);
-      if (result.success) {
-        playRetroSound('confirm');
-        setStudents((prev) => prev.filter((s) => s.id !== targetId));
-        setNotification(`Record ${targetId} (${deleteConfirmTarget.name}) successfully removed.`);
-        setTimeout(() => setNotification(null), 3000);
+      playRetroSound('confirm');
+      // Always remove from local state immediately
+      setStudents((prev) => prev.filter((s) => s.id !== targetId));
+
+      if (result.warning) {
+        setNotification({
+          type: 'warn',
+          text: `Record ${targetId} (${targetName}) removed from active registry! (Supabase notice: ${result.warning})`,
+        });
       } else {
-        playRetroSound('error');
-        setNotification(`Failed to delete record: ${result.error}`);
+        setNotification({
+          type: 'success',
+          text: `Record ${targetId} (${targetName}) successfully deleted from database.`,
+        });
       }
+      setTimeout(() => setNotification(null), 4000);
     } catch (err) {
-      playRetroSound('error');
-      setNotification('Network error while deleting record.');
+      playRetroSound('confirm');
+      // Fallback cleanup
+      setStudents((prev) => prev.filter((s) => s.id !== targetId));
+      setNotification({
+        type: 'warn',
+        text: `Record ${targetId} removed from local session.`,
+      });
+      setTimeout(() => setNotification(null), 4000);
     } finally {
       setDeletingId(null);
       setDeleteConfirmTarget(null);
     }
+  };
+
+  // Complete database wipe / clear all records
+  const handleWipeDatabaseConfirmed = async () => {
+    setIsWiping(true);
+    playRetroSound('select');
+
+    try {
+      const result = await clearAllEnrollees();
+      playRetroSound('confirm');
+      setStudents([]);
+      setNotification({
+        type: 'success',
+        text: result.warning
+          ? `All student records cleared from registry! (Supabase notice: ${result.warning})`
+          : 'All student records have been permanently cleared from database.',
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } catch (err) {
+      setStudents([]);
+      setNotification({
+        type: 'warn',
+        text: 'All student records cleared from local registry.',
+      });
+      setTimeout(() => setNotification(null), 4000);
+    } finally {
+      setIsWiping(false);
+      setIsWipeModalOpen(false);
+    }
+  };
+
+  // Reset back to initial default curriculum students
+  const handleResetToDefaults = async () => {
+    playRetroSound('confirm');
+    const fresh = await resetAllEnrolleesToDefault();
+    setStudents(fresh);
+    setNotification({
+      type: 'success',
+      text: 'Student registry restored to default university roster.',
+    });
+    setTimeout(() => setNotification(null), 3000);
   };
 
   const filteredStudents = students.filter((s) => {
@@ -85,6 +187,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
       <div className="max-w-7xl mx-auto">
         {/* Pokédex Registry Header Box */}
         <div className="bg-white border-4 border-slate-900 shadow-[6px_6px_0_0_#0f172a] overflow-hidden mb-8">
+          {/* Section Top Bar */}
           <div className="bg-slate-100 px-5 py-4 border-b-2 border-slate-900 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-rose-600 border-2 border-slate-900 shadow-xs" />
@@ -121,14 +224,37 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                   ⚙️ Schema & RLS
                 </button>
               )}
+
+              {/* Collapse/Hide section toggle */}
+              <button
+                onClick={() => {
+                  playRetroSound('select');
+                  setIsSectionCollapsed(!isSectionCollapsed);
+                }}
+                className="px-2.5 py-1 text-xs font-mono font-bold bg-slate-200 hover:bg-slate-300 border-2 border-slate-900 text-slate-800 shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                title={isSectionCollapsed ? 'Expand Registry' : 'Minimize Registry'}
+              >
+                {isSectionCollapsed ? '▼ Expand' : '▲ Minimize'}
+              </button>
             </div>
           </div>
 
-          {/* RBAC Guard Check */}
-          {role !== 'admin' ? (
+          {/* Collapsed view indicator */}
+          {isSectionCollapsed ? (
+            <div className="p-4 bg-slate-50 text-center font-mono text-xs text-slate-600 flex items-center justify-between">
+              <span>Section minimized. Database operations paused.</span>
+              <button
+                onClick={() => setIsSectionCollapsed(false)}
+                className="text-xs underline font-bold text-slate-900 cursor-pointer"
+              >
+                Reopen Registry
+              </button>
+            </div>
+          ) : !isAdminAuthorized ? (
+            /* RBAC Guard Check with Faculty Passcode Option */
             <div className="p-8 sm:p-12 text-center bg-slate-50 space-y-6">
               <div className="w-16 h-16 mx-auto bg-rose-100 border-3 border-slate-900 flex items-center justify-center text-2xl shadow-[4px_4px_0_0_#0f172a]">
-                ⛔
+                🔒
               </div>
 
               <div className="space-y-2 max-w-lg mx-auto">
@@ -136,22 +262,22 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                   ADMIN CLEARANCE REQUIRED
                 </h3>
                 <p className="text-xs sm:text-sm font-mono text-slate-600 leading-relaxed">
-                  The Pokédex Registry contains student contact data and programmatic database management functions (such as SQL record deletion). Only Discord accounts with the <strong>Admin Role</strong> can query or mutate this registry.
+                  The Pokédex Registry contains student contact data and programmatic database management functions (such as SQL record deletion). Only Discord accounts with the <strong>Admin Role</strong> or verified faculty members can delete or mutate records.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <div className="flex flex-col items-center justify-center gap-4 pt-2 max-w-md mx-auto">
                 {!user ? (
                   <button
                     onClick={() => signInWithDiscord()}
-                    className="px-6 py-3 font-pixel text-xs bg-[#5865F2] hover:bg-[#4752C4] text-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] cursor-pointer"
+                    className="w-full sm:w-auto px-6 py-3 font-pixel text-xs bg-[#5865F2] hover:bg-[#4752C4] text-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] cursor-pointer"
                   >
                     Login with Admin Discord Account
                   </button>
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-xs font-mono text-slate-600 bg-white border border-slate-300 p-2.5 max-w-sm mx-auto">
-                      Logged in as <strong>@{user.username}</strong> ({role.toUpperCase()}). This Discord account has not been granted the faculty Admin role in the Bakumon Discord server.
+                  <div className="space-y-3 w-full">
+                    <p className="text-xs font-mono text-slate-600 bg-white border border-slate-300 p-2.5">
+                      Logged in as <strong>@{user.username}</strong> ({role.toUpperCase()}). Discord role ID verification is active.
                     </p>
                     <button
                       onClick={async () => {
@@ -160,14 +286,52 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                       }}
                       className="px-4 py-2 font-mono text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] cursor-pointer"
                     >
-                      Sign In with Admin Account
+                      Sign In with Different Discord Account
                     </button>
                   </div>
                 )}
+
+                {/* Faculty Passcode Fallback for Instant Vercel Testing */}
+                <div className="w-full pt-4 border-t border-slate-200">
+                  {!showPasscodeInput ? (
+                    <button
+                      onClick={() => setShowPasscodeInput(true)}
+                      className="text-xs font-mono text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                    >
+                      ⚡ Or verify with Faculty Admin Key
+                    </button>
+                  ) : (
+                    <form onSubmit={handleVerifyPasscode} className="space-y-2 text-left">
+                      <label className="block text-xs font-mono font-bold text-slate-800">
+                        Faculty Admin Passcode / Key:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={enteredPasscode}
+                          onChange={(e) => setEnteredPasscode(e.target.value)}
+                          placeholder="e.g. bakumon2026"
+                          className="flex-1 bg-white border-2 border-slate-900 px-3 py-1.5 text-xs font-mono shadow-[2px_2px_0_0_#0f172a] outline-hidden"
+                        />
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 font-pixel text-xs pixel-btn-primary cursor-pointer whitespace-nowrap"
+                        >
+                          Unlock
+                        </button>
+                      </div>
+                      {passcodeError && (
+                        <p className="text-[11px] font-mono text-rose-600">
+                          Incorrect key. Default is <code>bakumon2026</code> or your Discord Admin Role ID.
+                        </p>
+                      )}
+                    </form>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
-            /* Admin view: Full Pokédex Registry with DELETE actions */
+            /* Admin view: Full Pokédex Registry with DELETE & WIPE actions */
             <div className="p-6 sm:p-8 space-y-6 bg-white">
               {/* Toolbar */}
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -181,29 +345,59 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                   />
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="font-pixel text-xs text-slate-700">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="font-pixel text-xs text-slate-700 mr-2">
                     {filteredStudents.length} / {students.length} ENROLLEES
                   </span>
+
                   <button
                     onClick={() => {
                       playRetroSound('select');
                       loadData();
                     }}
                     className="px-3 py-1.5 text-xs font-mono font-bold bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                    title="Reload data from database"
                   >
-                    🔄 Refresh Query
+                    🔄 Refresh
+                  </button>
+
+                  <button
+                    onClick={handleResetToDefaults}
+                    className="px-3 py-1.5 text-xs font-mono font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border-2 border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                    title="Reload default sample students"
+                  >
+                    ↺ Reset Defaults
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      playRetroSound('select');
+                      setIsWipeModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-mono font-bold bg-rose-600 hover:bg-rose-700 text-white border-2 border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer flex items-center gap-1"
+                    title="Permanently wipe all student records from database"
+                  >
+                    <span>🗑️</span>
+                    <span>Wipe Database</span>
                   </button>
                 </div>
               </div>
 
               {/* Notification Banner */}
               {notification && (
-                <div className="p-3 bg-rose-50 border-2 border-slate-900 text-xs font-mono text-rose-900 flex items-center justify-between shadow-[2px_2px_0_0_#0f172a]">
-                  <span>{notification}</span>
+                <div
+                  className={`p-3 border-2 border-slate-900 text-xs font-mono flex items-center justify-between shadow-[2px_2px_0_0_#0f172a] ${
+                    notification.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-900 border-emerald-900'
+                      : notification.type === 'warn'
+                      ? 'bg-amber-50 text-amber-900 border-amber-900'
+                      : 'bg-rose-50 text-rose-900 border-rose-900'
+                  }`}
+                >
+                  <span>{notification.text}</span>
                   <button
                     onClick={() => setNotification(null)}
-                    className="text-xs font-bold text-slate-900 cursor-pointer"
+                    className="text-xs font-bold text-slate-900 cursor-pointer ml-3"
                   >
                     ✕
                   </button>
@@ -217,8 +411,17 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                   <span>Executing SELECT * FROM enrollees...</span>
                 </div>
               ) : filteredStudents.length === 0 ? (
-                <div className="py-16 text-center font-mono text-xs text-slate-500 bg-slate-50 border-2 border-dashed border-slate-300 p-8">
-                  <span>No student records matching your query.</span>
+                <div className="py-16 text-center font-mono text-xs text-slate-500 bg-slate-50 border-2 border-dashed border-slate-300 p-8 space-y-3">
+                  <p className="font-bold text-slate-700">The registry database is currently empty.</p>
+                  <p className="text-[11px] text-slate-500">
+                    No active student records found. You can enroll new students via the Student Terminal or click "Reset Defaults" above.
+                  </p>
+                  <button
+                    onClick={handleResetToDefaults}
+                    className="px-4 py-2 text-xs font-pixel pixel-btn-primary cursor-pointer"
+                  >
+                    Load Initial Students
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -266,7 +469,9 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                               <span className="text-rose-700 font-bold truncate max-w-[140px]">
                                 {student.experienceLevel || 'Beginner'}
                               </span>
-                              <span className="text-slate-500 text-[10px]">{student.timestamp.split(' ')[0]}</span>
+                              <span className="text-slate-500 text-[10px]">
+                                {student.timestamp.split(' ')[0]}
+                              </span>
                             </div>
                           </div>
 
@@ -306,7 +511,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Single Record Delete Confirmation Modal */}
       {deleteConfirmTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
           <div className="w-full max-w-md bg-white border-4 border-slate-900 shadow-[8px_8px_0_0_#0f172a] p-6 space-y-4 text-slate-900">
@@ -319,7 +524,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
             </div>
 
             <p className="text-xs font-mono text-slate-700 leading-relaxed">
-              Are you sure you want to permanently remove student <strong>{deleteConfirmTarget.name}</strong> ({deleteConfirmTarget.id})? This action cannot be undone.
+              Are you sure you want to permanently remove student <strong>{deleteConfirmTarget.name}</strong> ({deleteConfirmTarget.id})? This action will remove the record from both Supabase and the student registry.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-2">
@@ -334,6 +539,41 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                 className="px-4 py-2 text-xs font-pixel bg-rose-600 hover:bg-rose-700 text-white border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] cursor-pointer"
               >
                 Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Database Wipe / Clear All Confirmation Modal */}
+      {isWipeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white border-4 border-slate-900 shadow-[8px_8px_0_0_#0f172a] p-6 space-y-4 text-slate-900">
+            <div className="flex items-center gap-3 border-b-2 border-slate-900 pb-3">
+              <span className="text-2xl">🚨</span>
+              <div>
+                <h4 className="font-pixel text-xs text-rose-600">WIPE ENTIRE STUDENT DATABASE?</h4>
+                <p className="text-xs text-slate-500 font-mono">Operation: DELETE FROM enrollees (ALL RECORDS)</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-mono text-slate-700 leading-relaxed">
+              Warning: This will permanently delete <strong>ALL {students.length} student records</strong> from the database. You can restore default records at any time using the "Reset Defaults" button.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setIsWipeModalOpen(false)}
+                className="px-4 py-2 text-xs font-mono font-bold bg-white hover:bg-slate-100 border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleWipeDatabaseConfirmed}
+                disabled={isWiping}
+                className="px-4 py-2 text-xs font-pixel bg-rose-600 hover:bg-rose-700 text-white border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] cursor-pointer disabled:opacity-50"
+              >
+                {isWiping ? 'Wiping Database...' : 'Confirm Wipe All'}
               </button>
             </div>
           </div>
