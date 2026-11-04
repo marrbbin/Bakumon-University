@@ -1,47 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseConfig } from '../types';
 
-const STORAGE_KEYS = {
-  URL: 'bakumon_supabase_url',
-  ANON_KEY: 'bakumon_supabase_anon_key',
-  GUILD_ID: 'bakumon_discord_guild_id',
-  STUDENT_ROLE: 'bakumon_student_role_id',
-  ADMIN_ROLE: 'bakumon_admin_role_id',
-};
+import {
+  DEFAULT_SUPABASE_CONFIG,
+  loadConfigFromStore,
+  persistConfigToStore,
+} from '../store';
 
-// Retrieve config from localStorage or Vite environment variables
+// Retrieve config with automatic defaults for Vercel and local dev
 export const getSupabaseConfig = (): SupabaseConfig => {
-  return {
-    supabaseUrl:
-      localStorage.getItem(STORAGE_KEYS.URL) ||
-      (import.meta.env.VITE_SUPABASE_URL as string) ||
-      '',
-    supabaseAnonKey:
-      localStorage.getItem(STORAGE_KEYS.ANON_KEY) ||
-      (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
-      '',
-    discordGuildId:
-      localStorage.getItem(STORAGE_KEYS.GUILD_ID) ||
-      (import.meta.env.VITE_DISCORD_GUILD_ID as string) ||
-      '123456789012345678', // Default Bakumon University Guild ID
-    studentRoleId:
-      localStorage.getItem(STORAGE_KEYS.STUDENT_ROLE) ||
-      (import.meta.env.VITE_STUDENT_ROLE_ID as string) ||
-      'student-role-101',
-    adminRoleId:
-      localStorage.getItem(STORAGE_KEYS.ADMIN_ROLE) ||
-      (import.meta.env.VITE_ADMIN_ROLE_ID as string) ||
-      'admin-role-professor-dk',
-  };
+  return loadConfigFromStore();
 };
 
 export const saveSupabaseConfig = (config: Partial<SupabaseConfig>) => {
-  if (config.supabaseUrl !== undefined) localStorage.setItem(STORAGE_KEYS.URL, config.supabaseUrl);
-  if (config.supabaseAnonKey !== undefined) localStorage.setItem(STORAGE_KEYS.ANON_KEY, config.supabaseAnonKey);
-  if (config.discordGuildId !== undefined) localStorage.setItem(STORAGE_KEYS.GUILD_ID, config.discordGuildId);
-  if (config.studentRoleId !== undefined) localStorage.setItem(STORAGE_KEYS.STUDENT_ROLE, config.studentRoleId);
-  if (config.adminRoleId !== undefined) localStorage.setItem(STORAGE_KEYS.ADMIN_ROLE, config.adminRoleId);
-
+  persistConfigToStore(config);
   // Reset the client instance so next call recreates it
   _client = null;
 };

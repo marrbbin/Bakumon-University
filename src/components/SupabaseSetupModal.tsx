@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { playRetroSound } from '../utils/audio';
+import { DEFAULT_SUPABASE_CONFIG } from '../store';
 
 interface SupabaseSetupModalProps {
   isOpen: boolean;
@@ -20,7 +21,30 @@ export const SupabaseSetupModal: React.FC<SupabaseSetupModalProps> = ({ isOpen, 
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Sync inputs whenever modal opens or config updates
+  useEffect(() => {
+    if (isOpen) {
+      setSupabaseUrl(config.supabaseUrl);
+      setSupabaseAnonKey(config.supabaseAnonKey);
+      setDiscordGuildId(config.discordGuildId);
+      setStudentRoleId(config.studentRoleId);
+      setAdminRoleId(config.adminRoleId);
+    }
+  }, [isOpen, config]);
+
   if (!isOpen) return null;
+
+  const handleRestoreDefaults = () => {
+    playRetroSound('confirm');
+    setSupabaseUrl(DEFAULT_SUPABASE_CONFIG.supabaseUrl);
+    setSupabaseAnonKey(DEFAULT_SUPABASE_CONFIG.supabaseAnonKey);
+    setDiscordGuildId(DEFAULT_SUPABASE_CONFIG.discordGuildId);
+    setStudentRoleId(DEFAULT_SUPABASE_CONFIG.studentRoleId);
+    setAdminRoleId(DEFAULT_SUPABASE_CONFIG.adminRoleId);
+    updateConfig(DEFAULT_SUPABASE_CONFIG);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
   const handleSave = () => {
     playRetroSound('confirm');
@@ -239,16 +263,26 @@ using (true);
                   </div>
                 </div>
 
-                <div className="pt-3 flex items-center justify-between">
-                  <button
-                    onClick={handleSave}
-                    className="px-5 py-2.5 font-pixel text-xs pixel-btn-primary cursor-pointer"
-                  >
-                    Save Credentials
-                  </button>
+                <div className="pt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleSave}
+                      className="px-5 py-2.5 font-pixel text-xs pixel-btn-primary cursor-pointer"
+                    >
+                      Save Credentials
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRestoreDefaults}
+                      className="px-3.5 py-2.5 font-mono text-xs border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold shadow-[2px_2px_0_0_#0f172a] cursor-pointer"
+                      title="Reset to pre-configured Bakumon University defaults in src/store"
+                    >
+                      ↺ Reset to Store Defaults
+                    </button>
+                  </div>
                   {saved && (
                     <span className="text-emerald-700 font-bold font-mono">
-                      ✓ Supabase settings saved to local environment!
+                      ✓ Supabase settings updated!
                     </span>
                   )}
                 </div>

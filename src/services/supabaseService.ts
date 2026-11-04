@@ -1,76 +1,18 @@
 import { Enrollee, ExperienceLevel, UserRole, DiscordUser } from '../types';
 import { getSupabaseClient, getSupabaseConfig } from './supabaseClient';
+import {
+  DEFAULT_INITIAL_STUDENTS,
+  getLocalEnrolleesStore,
+  saveLocalEnrolleesStore,
+  addLocalEnrollee,
+  removeLocalEnrollee,
+  findLocalEnrolleeByUserId,
+} from '../store';
 
-const LOCAL_ENROLLEES_KEY = 'bakumon_supabase_enrollees_cache';
-
-export const DEFAULT_INITIAL_STUDENTS: Enrollee[] = [
-  {
-    id: 'BKU-5001',
-    name: 'Hilbert Black',
-    mcUsername: 'Hilbert',
-    handle: '@hilbert_nawawa',
-    experienceLevel: 'Advanced (Elite Four Caliber)',
-    timestamp: '2026-10-28 14:22',
-    status: 'Enrolled',
-    notes: 'Mastering EV/IV spreads and botanical farming.',
-    userId: 'user-hilbert-001',
-  },
-  {
-    id: 'BKU-5002',
-    name: 'Hilda White',
-    mcUsername: 'Hilda',
-    handle: '@hilda_subway',
-    experienceLevel: 'Intermediate (Gym Challenger)',
-    timestamp: '2026-10-29 09:15',
-    status: 'Enrolled',
-    notes: 'Daycare breeding mechanics and team synergy.',
-    userId: 'user-hilda-002',
-  },
-  {
-    id: 'BKU-5003',
-    name: 'Cheren Schrenk',
-    mcUsername: 'Cheren',
-    handle: '@cheren_aspertia',
-    experienceLevel: 'Advanced (Elite Four Caliber)',
-    timestamp: '2026-10-30 11:40',
-    status: 'Enrolled',
-    notes: 'Analyzing mathematical damage rolls and speed tiers.',
-    userId: 'user-cheren-003',
-  },
-  {
-    id: 'BKU-5004',
-    name: 'Bianca Belle',
-    mcUsername: 'Bianca',
-    handle: '@bianca_daycare',
-    experienceLevel: 'Beginner (Fresh out of Nuvema)',
-    timestamp: '2026-10-31 16:05',
-    status: 'Enrolled',
-    notes: 'Beginner trainer ready to learn from square one!',
-    userId: 'user-bianca-004',
-  },
-];
-
-// Helper: load local mock enrollees
-export const getLocalEnrollees = (): Enrollee[] => {
-  try {
-    const raw = localStorage.getItem(LOCAL_ENROLLEES_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_ENROLLEES_KEY, JSON.stringify(DEFAULT_INITIAL_STUDENTS));
-      return DEFAULT_INITIAL_STUDENTS;
-    }
-    return JSON.parse(raw);
-  } catch {
-    return DEFAULT_INITIAL_STUDENTS;
-  }
-};
-
-export const saveLocalEnrollees = (list: Enrollee[]) => {
-  try {
-    localStorage.setItem(LOCAL_ENROLLEES_KEY, JSON.stringify(list));
-  } catch (e) {
-    console.error('Failed to save to local storage', e);
-  }
-};
+// Re-export for compatibility
+export { DEFAULT_INITIAL_STUDENTS };
+export const getLocalEnrollees = getLocalEnrolleesStore;
+export const saveLocalEnrollees = saveLocalEnrolleesStore;
 
 /**
  * Fetch all enrollees (SELECT * FROM enrollees)
