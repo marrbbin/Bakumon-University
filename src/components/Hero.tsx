@@ -11,7 +11,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
   const { user, role, signInWithDiscord, signOut, setUserRole } = useAuth();
 
   const fullDialogue =
-    "Hello there! Welcome to Bakumon University! Our academy was founded in Nawawaa Region to teach the true science of Pokémon mechanics: Battling, Breeding, Brewing, and Berry Farming. Log in with your Discord account to verify your student or faculty credentials. Ready to begin?";
+    "Hello there! Welcome to Bakumon University! Our academy was founded in Nawawa Region to teach the true science of Pokémon mechanics. Choose one or multiple majors that match your ambitions: Battling, Breeding, Brewing, or Berry Farming! Log in with your Discord account to enroll. Ready to begin?";
 
   const [displayedText, setDisplayedText] = useState('');
   const [isTypingDone, setIsTypingDone] = useState(false);
@@ -70,7 +70,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
                 </span>
               </h1>
               <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-xl">
-                Bakumon University is the premier roleplay institution dedicated to transforming beginners into competitive masters. Study EV/IV calculus, pedigree genetics, medicine compounding, and berry agriculture in a welcoming environment.
+                Bakumon University is the premier roleplay institution dedicated to transforming beginners into competitive masters. Study EV/IV calculus, pedigree genetics, medicine compounding, and berry agriculture in custom single or multi-major tracks.
               </p>
             </div>
 
@@ -195,7 +195,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
                       onClick={() => playRetroSound('select')}
                       className="px-3.5 py-2 text-xs font-mono font-semibold pixel-btn-secondary"
                     >
-                      Explore The 4 Subjects
+                      Explore The 4 Majors
                     </a>
                   </div>
                 </div>
@@ -206,11 +206,11 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
             <div className="pt-4 border-t border-slate-200 grid grid-cols-3 gap-4 text-xs max-w-lg">
               <div>
                 <span className="font-pixel text-slate-900 block text-base tabular-nums">4</span>
-                <span className="text-slate-500 font-medium">Core Subjects</span>
+                <span className="text-slate-500 font-medium">Major Tracks</span>
               </div>
               <div>
-                <span className="font-pixel text-rose-600 block text-base tabular-nums">1</span>
-                <span className="text-slate-500 font-medium">Unified Major</span>
+                <span className="font-pixel text-rose-600 block text-base tabular-nums">1 - 4</span>
+                <span className="text-slate-500 font-medium">Majors / Student</span>
               </div>
               <div>
                 <span className="font-pixel text-slate-900 block text-base tabular-nums">RBAC</span>

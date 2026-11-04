@@ -13,12 +13,14 @@ export interface Enrollee {
   mcUsername?: string;
   handle: string; // Discord handle (e.g. @ash_ketchum)
   experienceLevel?: ExperienceLevel | string;
+  majors?: SubjectType[]; // Enrolled major(s) - student can select 1 or multiple
   timestamp: string;
   status?: string;
   notes?: string;
   userId?: string; // Supabase auth user UUID
   avatarUrl?: string;
 }
+
 
 export interface DiscordUser {
   id: string;

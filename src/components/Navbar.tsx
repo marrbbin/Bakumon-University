@@ -52,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSupabaseSetup }) => {
             onClick={() => playRetroSound('select')}
             className="hover:text-slate-900 transition-colors whitespace-nowrap"
           >
-            The 4 Subjects
+            Major Tracks
           </a>
           <a
             href="#terminal"

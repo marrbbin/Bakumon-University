@@ -184,6 +184,7 @@ export const DatabaseViewerModal: React.FC<DatabaseViewerModalProps> = ({
                       <th className="p-2 border-r border-slate-300 font-bold">name</th>
                       <th className="p-2 border-r border-slate-300 font-bold">mcUsername</th>
                       <th className="p-2 border-r border-slate-300 font-bold">handle</th>
+                      <th className="p-2 border-r border-slate-300 font-bold">majors</th>
                       <th className="p-2 border-r border-slate-300 font-bold">timestamp</th>
                       <th className="p-2 border-r border-slate-300 font-bold">status</th>
                       <th className="p-2 font-bold">notes</th>
@@ -206,6 +207,15 @@ export const DatabaseViewerModal: React.FC<DatabaseViewerModalProps> = ({
                           </div>
                         </td>
                         <td className="p-2 border-r border-slate-200 text-slate-700">{s.handle}</td>
+                        <td className="p-2 border-r border-slate-200">
+                          <div className="flex flex-wrap gap-1">
+                            {(s.majors && s.majors.length > 0 ? s.majors : ['Battling']).map((m) => (
+                              <span key={m} className="px-1.5 py-0.2 bg-slate-100 text-slate-800 border border-slate-400 text-[10px]">
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
                         <td className="p-2 border-r border-slate-200 text-slate-500 text-[11px]">{s.timestamp}</td>
                         <td className="p-2 border-r border-slate-200">
                           <span className="px-1.5 py-0.5 text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-400">

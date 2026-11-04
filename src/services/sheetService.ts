@@ -158,12 +158,13 @@ export const resetDatabase = (): Enrollee[] => {
  * Generates CSV string from enrollees list for 1-click download/import.
  */
 export const exportEnrolleesToCsv = (students: Enrollee[]): string => {
-  const headers = ['id', 'name', 'mcUsername', 'handle', 'timestamp', 'status', 'notes'];
+  const headers = ['id', 'name', 'mcUsername', 'handle', 'majors', 'timestamp', 'status', 'notes'];
   const rows = students.map((s) => [
     `"${s.id}"`,
     `"${(s.name || '').replace(/"/g, '""')}"`,
     `"${(s.mcUsername || '').replace(/"/g, '""')}"`,
     `"${(s.handle || '').replace(/"/g, '""')}"`,
+    `"${(s.majors ? s.majors.join('; ') : 'Battling').replace(/"/g, '""')}"`,
     `"${(s.timestamp || '').replace(/"/g, '""')}"`,
     `"${(s.status || '').replace(/"/g, '""')}"`,
     `"${(s.notes || '').replace(/"/g, '""')}"`,

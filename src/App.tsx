@@ -13,13 +13,17 @@ import { AdminRoster } from './components/AdminRoster';
 import { AboutSection } from './components/AboutSection';
 import { Footer } from './components/Footer';
 import { SupabaseSetupModal } from './components/SupabaseSetupModal';
-import { Enrollee } from './types';
+import { Enrollee, SubjectType } from './types';
 
 function MainApp() {
   const [isSupabaseSetupOpen, setIsSupabaseSetupOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [preselectedMajor, setPreselectedMajor] = useState<SubjectType | undefined>();
 
-  const handleGoToEnrollment = () => {
+  const handleGoToEnrollment = (majorId?: SubjectType) => {
+    if (majorId) {
+      setPreselectedMajor(majorId);
+    }
     const terminalEl = document.getElementById('terminal');
     if (terminalEl) {
       terminalEl.scrollIntoView({ behavior: 'smooth' });
@@ -40,13 +44,14 @@ function MainApp() {
         {/* Hero Section with Prominent "Login with Discord" CTA & Campus View */}
         <Hero onOpenSupabaseSetup={() => setIsSupabaseSetupOpen(true)} />
 
-        {/* The 4 Core Subjects within the Single Major */}
+        {/* The 4 Major Tracks */}
         <CurriculumSection onGoToEnrollment={handleGoToEnrollment} />
 
         {/* Student Terminal (Student Role Only) - Handles INSERT & Duplicate Prevention */}
         <StudentTerminal
           onEnrollmentComplete={handleEnrollmentComplete}
           onOpenSupabaseSetup={() => setIsSupabaseSetupOpen(true)}
+          preselectedMajor={preselectedMajor}
         />
 
         {/* Admin Roster (Admin Role Only) - Handles SELECT and programmatic DELETE */}

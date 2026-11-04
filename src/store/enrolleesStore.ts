@@ -16,6 +16,7 @@ export const DEFAULT_INITIAL_STUDENTS: Enrollee[] = [
     mcUsername: 'Hilbert',
     handle: '@hilbert_nawawa',
     experienceLevel: 'Advanced (Elite Four Caliber)',
+    majors: ['Battling', 'Breeding'],
     timestamp: '2026-10-28 14:22',
     status: 'Enrolled',
     notes: 'Mastering EV/IV spreads and botanical farming.',
@@ -27,6 +28,7 @@ export const DEFAULT_INITIAL_STUDENTS: Enrollee[] = [
     mcUsername: 'Hilda',
     handle: '@hilda_subway',
     experienceLevel: 'Intermediate (Gym Challenger)',
+    majors: ['Breeding', 'Berry Farming'],
     timestamp: '2026-10-29 09:15',
     status: 'Enrolled',
     notes: 'Daycare breeding mechanics and team synergy.',
@@ -38,6 +40,7 @@ export const DEFAULT_INITIAL_STUDENTS: Enrollee[] = [
     mcUsername: 'Cheren',
     handle: '@cheren_aspertia',
     experienceLevel: 'Advanced (Elite Four Caliber)',
+    majors: ['Battling', 'Brewing'],
     timestamp: '2026-10-30 11:40',
     status: 'Enrolled',
     notes: 'Analyzing mathematical damage rolls and speed tiers.',
@@ -49,6 +52,7 @@ export const DEFAULT_INITIAL_STUDENTS: Enrollee[] = [
     mcUsername: 'Bianca',
     handle: '@bianca_daycare',
     experienceLevel: 'Beginner (Fresh out of Nuvema)',
+    majors: ['Brewing', 'Berry Farming'],
     timestamp: '2026-10-31 16:05',
     status: 'Enrolled',
     notes: 'Beginner trainer ready to learn from square one!',
@@ -68,7 +72,16 @@ export const getLocalEnrolleesStore = (): Enrollee[] => {
       return DEFAULT_INITIAL_STUDENTS;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_INITIAL_STUDENTS;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Normalize to ensure every record has a valid majors array
+      return parsed.map((student: Enrollee) => ({
+        ...student,
+        majors: Array.isArray(student.majors) && student.majors.length > 0
+          ? student.majors
+          : ['Battling'],
+      }));
+    }
+    return DEFAULT_INITIAL_STUDENTS;
   } catch (err) {
     console.warn('Failed to parse enrollees from localStorage, using initial students:', err);
     return DEFAULT_INITIAL_STUDENTS;

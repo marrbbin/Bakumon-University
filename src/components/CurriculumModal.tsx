@@ -71,12 +71,12 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({
                 className="w-full h-full object-cover"
               />
               <span className="absolute bottom-2 left-2 text-[10px] font-pixel text-white bg-slate-950 px-2 py-0.5 border border-white">
-                CORE SUBJECT
+                MAJOR TRACK
               </span>
             </div>
             <div className="md:col-span-2 space-y-2">
               <span className="text-xs font-mono font-semibold tracking-wider uppercase" style={{ color: subject.accentColor }}>
-                Bakumon University Curriculum · Required Subject
+                Bakumon University Curriculum · Selectable Major Track
               </span>
               <h3 className="text-xl sm:text-2xl font-bold text-slate-900">{subject.title}</h3>
               <p className="text-sm text-slate-600 leading-relaxed">{subject.summary}</p>
@@ -151,9 +151,10 @@ export const CurriculumModal: React.FC<CurriculumModalProps> = ({
               playRetroSound('confirm');
               onGoToEnrollment();
             }}
-            className="px-5 py-2.5 font-pixel text-xs pixel-btn-accent cursor-pointer"
+            className="px-5 py-2.5 font-pixel text-xs pixel-btn-accent cursor-pointer flex items-center gap-1.5"
           >
-            Enroll in University ↓
+            <span>Enroll with {subject.id} Track</span>
+            <span>↓</span>
           </button>
         </div>
       </div>

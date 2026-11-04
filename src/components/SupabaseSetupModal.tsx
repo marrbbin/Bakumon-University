@@ -98,14 +98,14 @@ export const SupabaseSetupModal: React.FC<SupabaseSetupModalProps> = ({
 -- Project: https://awcbsdwbzzisyqqzdmgp.supabase.co
 -- ==============================================================================
 
--- 1. CREATE ENROLLEES TABLE
--- Uses 'text' for user_id to seamlessly accept both Discord Snowflake IDs and Supabase Auth UUIDs
+-- 1. CREATE ENROLLEES TABLE (with flexible majors support)
 create table if not exists public.enrollees (
   id text primary key,
   user_id text not null,
   name text not null,
   discord_handle text not null,
   experience_level text not null,
+  majors text[] default array['Battling']::text[],
   mc_username text,
   notes text,
   status text default 'Enrolled',
@@ -113,6 +113,9 @@ create table if not exists public.enrollees (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   constraint unique_user_enrollment unique (user_id)
 );
+
+-- Schema migration helper: adds majors column if table was already created
+alter table public.enrollees add column if not exists majors text[] default array['Battling']::text[];
 
 -- 2. ENABLE ROW LEVEL SECURITY (RLS)
 alter table public.enrollees enable row level security;

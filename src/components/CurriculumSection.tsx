@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { CURRICULUM_SUBJECTS } from '../data/curriculumData';
-import { CurriculumSubject } from '../types';
+import { CurriculumSubject, SubjectType } from '../types';
 import { CurriculumModal } from './CurriculumModal';
 import { playRetroSound } from '../utils/audio';
 
 interface CurriculumSectionProps {
-  onGoToEnrollment: () => void;
+  onGoToEnrollment: (majorId?: SubjectType) => void;
 }
 
 export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
@@ -19,8 +19,9 @@ export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
   };
 
   const handleEnrollFromModal = () => {
+    const majorId = activeModalSubject?.id;
     setActiveModalSubject(null);
-    onGoToEnrollment();
+    onGoToEnrollment(majorId);
   };
 
   return (
@@ -29,17 +30,17 @@ export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
         {/* Section Header */}
         <div className="mb-12 text-center max-w-3xl mx-auto space-y-3">
           <div className="flex items-center justify-center gap-2 text-xs font-mono font-semibold text-rose-600">
-            <span>ONE UNIFIED MAJOR</span>
+            <span>FLEXIBLE MAJOR TRACKS</span>
             <span aria-hidden="true">·</span>
-            <span>THE 4 CORE SUBJECTS</span>
+            <span>PICK 1 OR MULTIPLE MAJORS</span>
             <span aria-hidden="true">·</span>
             <span>NAWAWA TERM 2026</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
-            Four Core Subjects. One Comprehensive Program.
+            Choose Your Disciplines. Craft Your Degree.
           </h2>
           <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-            At Bakumon University, there is no need to pick between majors. Every admitted student studies all <strong>four core subjects</strong> to build full competitive mastery across battling, breeding, apothecary brewing, and berry horticulture.
+            Bakumon University offers modular major tracks! Students may declare a single concentrated major, double-major, or cross-enroll in multiple disciplines across Competitive Battling, Breeding, Alchemical Brewing, and Berry Farming.
           </p>
         </div>
 
@@ -67,7 +68,7 @@ export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
                   {subject.id}
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-mono font-semibold text-slate-900 bg-white border border-slate-900 shadow-[1px_1px_0_0_#0f172a]">
-                  Required Subject
+                  Major Track Available
                 </span>
               </div>
             </div>
@@ -112,11 +113,12 @@ export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
                 <button
                   onClick={() => {
                     playRetroSound('confirm');
-                    onGoToEnrollment();
+                    onGoToEnrollment(subject.id);
                   }}
-                  className="px-3.5 py-2 text-xs font-pixel pixel-btn-primary cursor-pointer"
+                  className="px-3.5 py-2 text-xs font-pixel pixel-btn-primary cursor-pointer flex items-center gap-1"
                 >
-                  Enroll Now
+                  <span>Enroll with {subject.id}</span>
+                  <span>→</span>
                 </button>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { Enrollee, ExperienceLevel, UserRole, DiscordUser } from '../types';
+import { Enrollee, ExperienceLevel, UserRole, DiscordUser, SubjectType } from '../types';
 import { getSupabaseClient, getSupabaseConfig } from './supabaseClient';
 import {
   DEFAULT_INITIAL_STUDENTS,
@@ -11,6 +11,25 @@ import {
   resetToDefaultLocalEnrollees,
   findLocalEnrolleeByUserId,
 } from '../store';
+
+/**
+ * Resilient parser for majors from Postgres text[], JSON arrays, or comma-separated strings
+ */
+export const parseMajorsList = (val: any): SubjectType[] => {
+  if (Array.isArray(val) && val.length > 0) return val as SubjectType[];
+  if (typeof val === 'string' && val.trim()) {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as SubjectType[];
+    } catch {
+      // not JSON
+    }
+    const split = val.split(',').map((s) => s.trim()).filter(Boolean);
+    if (split.length > 0) return split as SubjectType[];
+  }
+  return ['Battling'];
+};
+
 
 // Re-export for compatibility
 export { DEFAULT_INITIAL_STUDENTS };
@@ -117,6 +136,7 @@ export const fetchEnrollees = async (): Promise<{
           mcUsername: row.mc_username || row.mcUsername,
           handle: row.discord_handle || row.handle || '@trainer',
           experienceLevel: row.experience_level || row.experienceLevel || 'Beginner (Fresh out of Nuvema)',
+          majors: parseMajorsList(row.majors),
           timestamp: row.created_at ? new Date(row.created_at).toLocaleString() : row.timestamp || new Date().toLocaleString(),
           status: row.status || 'Enrolled',
           notes: row.notes || '',
@@ -163,6 +183,7 @@ export const checkUserAlreadyEnrolled = async (
             mcUsername: data.mc_username,
             handle: data.discord_handle,
             experienceLevel: data.experience_level,
+            majors: parseMajorsList(data.majors),
             timestamp: new Date(data.created_at || Date.now()).toLocaleString(),
             status: data.status,
             notes: data.notes,
@@ -208,6 +229,7 @@ export const insertEnrollee = async (payload: {
   name: string;
   discordHandle: string;
   experienceLevel: ExperienceLevel | string;
+  majors?: SubjectType[];
   mcUsername?: string;
   notes?: string;
   userId: string;
@@ -231,11 +253,15 @@ export const insertEnrollee = async (payload: {
   const generatedId = `BKU-${Math.floor(1000 + Math.random() * 9000)}`;
   const now = new Date().toLocaleString();
 
+  const chosenMajors: SubjectType[] =
+    payload.majors && payload.majors.length > 0 ? payload.majors : ['Battling'];
+
   const newEnrollee: Enrollee = {
     id: generatedId,
     name: payload.name.trim(),
     handle: payload.discordHandle.startsWith('@') ? payload.discordHandle : `@${payload.discordHandle}`,
     experienceLevel: payload.experienceLevel,
+    majors: chosenMajors,
     mcUsername: payload.mcUsername?.trim() || payload.name.trim(),
     notes: payload.notes?.trim() || '',
     timestamp: now,
@@ -247,23 +273,37 @@ export const insertEnrollee = async (payload: {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const { data, error } = await supabase
+      const insertRecord: Record<string, any> = {
+        id: generatedId,
+        user_id: payload.userId,
+        name: payload.name.trim(),
+        discord_handle: newEnrollee.handle,
+        experience_level: payload.experienceLevel,
+        majors: chosenMajors,
+        mc_username: newEnrollee.mcUsername,
+        notes: payload.notes || '',
+        status: 'Enrolled',
+        avatar_url: payload.avatarUrl || null,
+      };
+
+      let { data, error } = await supabase
         .from('enrollees')
-        .insert([
-          {
-            id: generatedId,
-            user_id: payload.userId,
-            name: payload.name.trim(),
-            discord_handle: newEnrollee.handle,
-            experience_level: payload.experienceLevel,
-            mc_username: newEnrollee.mcUsername,
-            notes: payload.notes || '',
-            status: 'Enrolled',
-            avatar_url: payload.avatarUrl || null,
-          },
-        ])
+        .insert([insertRecord])
         .select()
         .single();
+
+      // If error is specifically that the "majors" column does not exist on legacy tables, retry without it
+      if (error && (error.message?.includes('column "majors"') || error.message?.includes("'majors' column"))) {
+        console.warn('Notice: majors column not yet created in Supabase schema. Inserting without majors column...');
+        delete insertRecord.majors;
+        const retryResult = await supabase
+          .from('enrollees')
+          .insert([insertRecord])
+          .select()
+          .single();
+        data = retryResult.data;
+        error = retryResult.error;
+      }
 
       if (error) {
         console.error('Supabase INSERT failed:', error);

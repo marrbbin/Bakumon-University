@@ -164,3 +164,58 @@ export const CURRICULUM_SUBJECTS: CurriculumSubject[] = [
     ],
   },
 ];
+
+export interface MajorOption {
+  id: import('../types').SubjectType;
+  title: string;
+  department: string;
+  icon: string;
+  color: string;
+  badgeClass: string;
+  borderActive: string;
+  bgLight: string;
+}
+
+export const AVAILABLE_MAJORS: MajorOption[] = [
+  {
+    id: 'Battling',
+    title: 'Competitive Battling',
+    department: 'Tactical Warfare & Synergy',
+    icon: '⚔️',
+    color: '#e11d48',
+    badgeClass: 'bg-rose-100 text-rose-900 border-rose-400',
+    borderActive: 'border-rose-600 bg-rose-50/70',
+    bgLight: '#fff1f2',
+  },
+  {
+    id: 'Breeding',
+    title: 'Breeding & Genetics',
+    department: 'Hereditary Traits & Daycare',
+    icon: '🥚',
+    color: '#0284c7',
+    badgeClass: 'bg-sky-100 text-sky-900 border-sky-400',
+    borderActive: 'border-sky-600 bg-sky-50/70',
+    bgLight: '#f0f9ff',
+  },
+  {
+    id: 'Brewing',
+    title: 'Alchemical Brewing & Medicine',
+    department: 'Botanical Compounding & Chemistry',
+    icon: '🧪',
+    color: '#7c3aed',
+    badgeClass: 'bg-purple-100 text-purple-900 border-purple-400',
+    borderActive: 'border-purple-600 bg-purple-50/70',
+    bgLight: '#faf5ff',
+  },
+  {
+    id: 'Berry Farming',
+    title: 'Berry Horticulture & Farming',
+    department: 'Agricultural Science & Botanical Yields',
+    icon: '🌱',
+    color: '#16a34a',
+    badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-400',
+    borderActive: 'border-emerald-600 bg-emerald-50/70',
+    bgLight: '#f0fdf4',
+  },
+];
+

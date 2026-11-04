@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Enrollee } from '../types';
+import { Enrollee, SubjectType } from '../types';
+import { AVAILABLE_MAJORS } from '../data/curriculumData';
 import {
   fetchEnrollees,
   deleteEnrollee,
@@ -26,6 +27,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   const [dataSource, setDataSource] = useState<'supabase' | 'local_storage'>('local_storage');
   const [tableMissing, setTableMissing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMajorFilter, setSelectedMajorFilter] = useState<'All' | SubjectType>('All');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Enrollee | null>(null);
   const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
@@ -179,13 +181,20 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   };
 
   const filteredStudents = students.filter((s) => {
+    // Major filter
+    const studentMajors = s.majors && s.majors.length > 0 ? s.majors : ['Battling'];
+    if (selectedMajorFilter !== 'All' && !studentMajors.includes(selectedMajorFilter)) {
+      return false;
+    }
+
     const term = searchTerm.toLowerCase();
     return (
       s.name.toLowerCase().includes(term) ||
       s.handle.toLowerCase().includes(term) ||
       s.id.toLowerCase().includes(term) ||
       (s.mcUsername && s.mcUsername.toLowerCase().includes(term)) ||
-      (s.experienceLevel && s.experienceLevel.toLowerCase().includes(term))
+      (s.experienceLevel && s.experienceLevel.toLowerCase().includes(term)) ||
+      studentMajors.some((m) => m.toLowerCase().includes(term))
     );
   });
 
@@ -440,6 +449,48 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                     <span>Wipe Database</span>
                   </button>
                 </div>
+
+                {/* Major Filter Strip */}
+                <div className="w-full flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-200">
+                  <span className="text-[11px] font-mono text-slate-500 font-bold mr-1">Filter Major:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playRetroSound('select');
+                      setSelectedMajorFilter('All');
+                    }}
+                    className={`px-2.5 py-1 text-[11px] font-mono font-bold border transition-colors cursor-pointer ${
+                      selectedMajorFilter === 'All'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-[1px_1px_0_0_#0f172a]'
+                        : 'bg-white text-slate-700 border-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    All ({students.length})
+                  </button>
+                  {AVAILABLE_MAJORS.map((m) => {
+                    const count = students.filter((s) => (s.majors || ['Battling']).includes(m.id)).length;
+                    const isSelected = selectedMajorFilter === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          playRetroSound('select');
+                          setSelectedMajorFilter(m.id);
+                        }}
+                        className={`px-2.5 py-1 text-[11px] font-mono font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
+                          isSelected
+                            ? `${m.badgeClass} border-slate-900 shadow-[2px_2px_0_0_#0f172a]`
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-slate-500'
+                        }`}
+                      >
+                        <span>{m.icon}</span>
+                        <span>{m.id}</span>
+                        <span className="text-[10px] opacity-75">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Notification Banner */}
@@ -531,6 +582,30 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                               <span className="text-slate-500 text-[10px]">
                                 {student.timestamp.split(' ')[0]}
                               </span>
+                            </div>
+                          </div>
+
+                          {/* Declared Major(s) */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-semibold font-mono">
+                              <span>Declared Major(s)</span>
+                              <span className="text-slate-500">{student.majors?.length || 1} Selected</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {(student.majors && student.majors.length > 0 ? student.majors : ['Battling']).map((m) => {
+                                const majorConfig = AVAILABLE_MAJORS.find((opt) => opt.id === m);
+                                return (
+                                  <span
+                                    key={m}
+                                    className={`px-1.5 py-0.5 text-[10px] font-mono font-bold border border-slate-900 flex items-center gap-1 shadow-[1px_1px_0_0_#0f172a] ${
+                                      majorConfig?.badgeClass || 'bg-slate-100 text-slate-800'
+                                    }`}
+                                  >
+                                    <span>{majorConfig?.icon || '📜'}</span>
+                                    <span>{m}</span>
+                                  </span>
+                                );
+                              })}
                             </div>
                           </div>
 

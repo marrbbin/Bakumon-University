@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Enrollee, ExperienceLevel } from '../types';
-import { CAMPUS_ASSETS } from '../data/curriculumData';
+import { Enrollee, ExperienceLevel, SubjectType } from '../types';
+import { CAMPUS_ASSETS, AVAILABLE_MAJORS } from '../data/curriculumData';
 import {
   insertEnrollee,
   checkUserAlreadyEnrolled,
@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 interface StudentTerminalProps {
   onEnrollmentComplete?: (newEnrollee: Enrollee) => void;
   onOpenSupabaseSetup?: () => void;
+  preselectedMajor?: SubjectType;
 }
 
 const EXPERIENCE_OPTIONS: ExperienceLevel[] = [
@@ -26,6 +27,7 @@ const EXPERIENCE_OPTIONS: ExperienceLevel[] = [
 export const StudentTerminal: React.FC<StudentTerminalProps> = ({
   onEnrollmentComplete,
   onOpenSupabaseSetup,
+  preselectedMajor,
 }) => {
   const { user, role, signInWithDiscord, isConfigured } = useAuth();
 
@@ -33,7 +35,15 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
   const [mcUsername, setMcUsername] = useState('');
   const [discordHandle, setDiscordHandle] = useState('');
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>(EXPERIENCE_OPTIONS[0]);
+  const [selectedMajors, setSelectedMajors] = useState<SubjectType[]>(['Battling']);
   const [notes, setNotes] = useState('');
+
+  // Sync preselectedMajor if user clicks "Enroll with this Major" from curriculum cards
+  useEffect(() => {
+    if (preselectedMajor) {
+      setSelectedMajors((prev) => (prev.includes(preselectedMajor) ? prev : [...prev, preselectedMajor]));
+    }
+  }, [preselectedMajor]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRefreshingPass, setIsRefreshingPass] = useState(false);
@@ -106,6 +116,30 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
 
   const activeSkin = mcUsername.trim() || name.trim() || user?.username || 'Steve';
 
+  const handleToggleMajor = (majorId: SubjectType) => {
+    playRetroSound('select');
+    setSelectedMajors((prev) => {
+      if (prev.includes(majorId)) {
+        if (prev.length <= 1) {
+          return prev; // keep at least 1 major selected
+        }
+        return prev.filter((m) => m !== majorId);
+      } else {
+        return [...prev, majorId];
+      }
+    });
+  };
+
+  const handleSelectAllMajors = () => {
+    playRetroSound('confirm');
+    setSelectedMajors(['Battling', 'Breeding', 'Brewing', 'Berry Farming']);
+  };
+
+  const handleResetSingleMajor = (majorId: SubjectType = 'Battling') => {
+    playRetroSound('select');
+    setSelectedMajors([majorId]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -133,6 +167,12 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
       return;
     }
 
+    if (selectedMajors.length === 0) {
+      playRetroSound('error');
+      setStatusMessage({ type: 'error', text: 'Please select at least one major track for your degree.' });
+      return;
+    }
+
     setIsSubmitting(true);
     setStatusMessage(null);
     playRetroSound('confirm');
@@ -142,6 +182,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
         name: name.trim(),
         discordHandle: discordHandle.trim(),
         experienceLevel,
+        majors: selectedMajors,
         mcUsername: mcUsername.trim() || name.trim(),
         notes: notes.trim(),
         userId: user.id,
@@ -315,6 +356,27 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                           <span className="text-slate-400 block text-[10px]">ENROLLMENT TIMESTAMP</span>
                           <span className="text-slate-600">{existingPass.timestamp}</span>
                         </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">
+                            DECLARED MAJOR TRACK(S) ({existingPass.majors?.length || 1})
+                          </span>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {(existingPass.majors && existingPass.majors.length > 0 ? existingPass.majors : ['Battling']).map((m) => {
+                              const majorConfig = AVAILABLE_MAJORS.find((opt) => opt.id === m);
+                              return (
+                                <span
+                                  key={m}
+                                  className={`px-2 py-0.5 text-[11px] font-mono font-bold border-2 border-slate-900 shadow-[1px_1px_0_0_#0f172a] flex items-center gap-1 ${
+                                    majorConfig?.badgeClass || 'bg-slate-100 text-slate-800'
+                                  }`}
+                                >
+                                  <span>{majorConfig?.icon || '📜'}</span>
+                                  <span>{m}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
                         {existingPass.notes && (
                           <div>
                             <span className="text-slate-400 block text-[10px]">STUDENT AMBITION / NOTES</span>
@@ -378,13 +440,13 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                   <form onSubmit={handleSubmit} className="lg:col-span-8 space-y-5">
                     <div className="border-b-2 border-slate-900 pb-3">
                       <span className="font-pixel text-xs text-rose-600 block">
-                        UNIFIED REGISTRATION FORM
+                        ACADEMIC ENROLLMENT APPLICATION
                       </span>
                       <h3 className="text-lg font-bold text-slate-900">
-                        Enroll in Bakumon University (All 4 Core Subjects)
+                        Select Your Major Track(s) & Trainer Profile
                       </h3>
                       <p className="text-xs text-slate-500 font-mono mt-0.5">
-                        Authenticated as: <strong>@{user?.username}</strong> ({user?.id.slice(0, 8)}...)
+                        Pick one or many disciplines. Authenticated as: <strong>@{user?.username}</strong> ({user?.id.slice(0, 8)}...)
                       </p>
                     </div>
 
@@ -483,6 +545,84 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                       </div>
                     </div>
 
+                    {/* Major Selection (Pick 1 or Many) */}
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <label className="block text-xs font-mono font-bold text-slate-900">
+                            Select Academic Major(s) *
+                          </label>
+                          <span className="text-[11px] font-mono text-slate-500">
+                            Pick one, two, three, or all four major disciplines ({selectedMajors.length} selected):
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px] font-mono">
+                          <button
+                            type="button"
+                            onClick={handleSelectAllMajors}
+                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-900 text-slate-800 font-bold shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                          >
+                            ✓ Select All 4
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleResetSingleMajor('Battling')}
+                            className="px-2 py-0.5 bg-white hover:bg-slate-100 border border-slate-400 text-slate-600 font-medium cursor-pointer"
+                          >
+                            Single Major Only
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {AVAILABLE_MAJORS.map((major) => {
+                          const isSelected = selectedMajors.includes(major.id);
+                          return (
+                            <button
+                              key={major.id}
+                              type="button"
+                              onClick={() => handleToggleMajor(major.id)}
+                              className={`p-3 text-left border-2 transition-all cursor-pointer flex items-start gap-3 relative ${
+                                isSelected
+                                  ? `${major.borderActive} border-slate-900 shadow-[3px_3px_0_0_#0f172a]`
+                                  : 'border-slate-300 bg-white hover:border-slate-500 opacity-75 hover:opacity-100'
+                              }`}
+                            >
+                              {/* Custom Checkbox Indicator */}
+                              <div
+                                className={`w-5 h-5 shrink-0 border-2 border-slate-900 flex items-center justify-center font-bold text-xs mt-0.5 ${
+                                  isSelected ? 'bg-slate-900 text-white' : 'bg-white text-transparent'
+                                }`}
+                              >
+                                {isSelected ? '✓' : ''}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5 truncate">
+                                    <span>{major.icon}</span>
+                                    <span>{major.title}</span>
+                                  </span>
+                                  {isSelected && (
+                                    <span
+                                      className="text-[9px] font-pixel px-1.5 py-0.2 border border-slate-900 shrink-0"
+                                      style={{ backgroundColor: major.color, color: '#fff' }}
+                                    >
+                                      SELECTED
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-500 font-mono block truncate">
+                                  {major.department}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* Ambition / Notes */}
                     <div className="space-y-1">
                       <label className="block text-xs font-mono font-bold text-slate-900">
@@ -550,6 +690,29 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                         <span className="text-[10px] text-emerald-700 font-mono font-semibold">
                           SkinRestorer & Cracked Ready
                         </span>
+                      </div>
+                    </div>
+
+                    {/* Live Chosen Majors Preview */}
+                    <div className="p-3 bg-white border border-slate-300 text-xs font-mono space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 uppercase font-bold">
+                        <span>Selected Track(s):</span>
+                        <span className="text-rose-600 font-bold">{selectedMajors.length} / 4 Majors</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedMajors.map((m) => {
+                          const config = AVAILABLE_MAJORS.find((opt) => opt.id === m);
+                          return (
+                            <span
+                              key={m}
+                              className={`px-1.5 py-0.5 text-[10px] font-bold border border-slate-900 ${
+                                config?.badgeClass || 'bg-slate-100 text-slate-800'
+                              }`}
+                            >
+                              {config?.icon} {m}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
 
