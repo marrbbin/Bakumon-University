@@ -137,3 +137,13 @@ export const findLocalEnrolleeByUserId = (userId: string): Enrollee | undefined 
   const list = getLocalEnrolleesStore();
   return list.find((s) => s.userId === userId);
 };
+
+/**
+ * Remove an enrollee by userId from the local store.
+ */
+export const removeLocalEnrolleeByUserId = (userId: string): Enrollee[] => {
+  const current = getLocalEnrolleesStore();
+  const updated = current.filter((s) => s.userId !== userId);
+  saveLocalEnrolleesStore(updated);
+  return updated;
+};

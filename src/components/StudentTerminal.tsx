@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Enrollee, ExperienceLevel } from '../types';
 import { CAMPUS_ASSETS } from '../data/curriculumData';
 import {
   insertEnrollee,
   checkUserAlreadyEnrolled,
+  deleteEnrolleeByUserId,
   checkSupabaseHealth,
   SupabaseHealth,
 } from '../services/supabaseService';
@@ -35,6 +36,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
   const [notes, setNotes] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshingPass, setIsRefreshingPass] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error' | 'info' | 'warn';
     text: string;
@@ -50,25 +52,57 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
     checkSupabaseHealth().then((h) => setDbHealth(h));
   }, []);
 
-  // Auto-fill Discord handle and name from active session
+  // Check enrollment in database
+  const refreshEnrollment = useCallback(async (userId?: string) => {
+    const targetId = userId || user?.id;
+    if (!targetId) {
+      setExistingPass(null);
+      setStatusMessage(null);
+      return;
+    }
+
+    try {
+      const res = await checkUserAlreadyEnrolled(targetId);
+      if (res.enrolled && res.enrollee) {
+        setExistingPass(res.enrollee);
+        setStatusMessage({
+          type: 'info',
+          text: `Welcome back, Trainer! You are currently registered under Student ID ${res.enrollee.id}. Duplicate submissions are restricted.`,
+        });
+      } else {
+        // Not enrolled or previously deleted!
+        setExistingPass(null);
+        setStatusMessage(null);
+      }
+    } catch (err) {
+      console.warn('Error verifying enrollment:', err);
+    }
+  }, [user?.id]);
+
+  // Auto-fill Discord handle and name from active session, and subscribe to database events
   useEffect(() => {
     if (user) {
       if (!name) setName(user.globalName || user.username || '');
       if (!discordHandle) setDiscordHandle(`@${user.username}`);
       if (!mcUsername) setMcUsername(user.username.replace(/[^a-zA-Z0-9_]/g, ''));
 
-      // Check if this student has already submitted
-      checkUserAlreadyEnrolled(user.id).then((res) => {
-        if (res.enrolled && res.enrollee) {
-          setExistingPass(res.enrollee);
-          setStatusMessage({
-            type: 'info',
-            text: `Welcome back, Trainer! You are already registered under Student ID ${res.enrollee.id}. Duplicate submissions are restricted.`,
-          });
-        }
-      });
+      refreshEnrollment(user.id);
+    } else {
+      setExistingPass(null);
+      setStatusMessage(null);
     }
-  }, [user]);
+
+    const handleDatabaseUpdate = () => {
+      if (user?.id) {
+        refreshEnrollment(user.id);
+      }
+    };
+
+    window.addEventListener('bakumon_enrollees_updated', handleDatabaseUpdate);
+    return () => {
+      window.removeEventListener('bakumon_enrollees_updated', handleDatabaseUpdate);
+    };
+  }, [user, refreshEnrollment]);
 
   const activeSkin = mcUsername.trim() || name.trim() || user?.username || 'Steve';
 
@@ -288,6 +322,52 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    {/* Quick Database Sync & Withdraw Actions */}
+                    <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={isRefreshingPass}
+                          onClick={async () => {
+                            playRetroSound('select');
+                            setIsRefreshingPass(true);
+                            if (user?.id) {
+                              await refreshEnrollment(user.id);
+                            }
+                            setIsRefreshingPass(false);
+                          }}
+                          className="px-3 py-1.5 text-xs font-mono font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          title="Verify live with Supabase if your record was deleted"
+                        >
+                          <span>{isRefreshingPass ? '⏳' : '🔄'}</span>
+                          <span>{isRefreshingPass ? 'Querying Supabase...' : 'Check Database Status'}</span>
+                        </button>
+                        <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
+                          (Click if you deleted your record in the database)
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!user?.id) return;
+                          if (confirm('Withdraw and delete your current enrollment record? This will allow you to re-enroll with fresh data.')) {
+                            playRetroSound('confirm');
+                            await deleteEnrolleeByUserId(user.id);
+                            setExistingPass(null);
+                            setStatusMessage({
+                              type: 'info',
+                              text: 'Previous enrollment cleared. You may now submit a new registration below.',
+                            });
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs font-mono font-semibold bg-white hover:bg-rose-50 text-rose-700 border border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                        title="Delete current enrollment record and re-enroll"
+                      >
+                        Withdraw & Re-enroll
+                      </button>
                     </div>
                   </div>
                 </div>

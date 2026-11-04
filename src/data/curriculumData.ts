@@ -1,12 +1,17 @@
 import { CurriculumSubject } from '../types';
+import heroCampusImg from '../assets/images/minimal_campus_hero_1793705438026.jpg';
+import battlingImg from '../assets/images/minimal_battling_art_1793705439651.jpg';
+import breedingImg from '../assets/images/minimal_breeding_art_1793705439211.jpg';
+import brewingImg from '../assets/images/minimal_brewing_art_1793705440573.jpg';
+import berryFarmingImg from '../assets/images/minimal_berry_art_1793705439756.jpg';
 
 export const CAMPUS_ASSETS = {
   logo: '/assets/aistudio/LOGO_Bakumon_HD_643d55b9.webp',
-  heroCampus: '/src/assets/images/minimal_campus_hero_1793705438026.jpg',
-  battling: '/src/assets/images/minimal_battling_art_1793705439651.jpg',
-  breeding: '/src/assets/images/minimal_breeding_art_1793705439211.jpg',
-  brewing: '/src/assets/images/minimal_brewing_art_1793705440573.jpg',
-  berryFarming: '/src/assets/images/minimal_berry_art_1793705439756.jpg',
+  heroCampus: heroCampusImg,
+  battling: battlingImg,
+  breeding: breedingImg,
+  brewing: brewingImg,
+  berryFarming: berryFarmingImg,
 };
 
 export const CURRICULUM_SUBJECTS: CurriculumSubject[] = [

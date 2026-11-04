@@ -6,6 +6,7 @@ import {
   saveLocalEnrolleesStore,
   addLocalEnrollee,
   removeLocalEnrollee,
+  removeLocalEnrolleeByUserId,
   clearAllLocalEnrollees,
   resetToDefaultLocalEnrollees,
   findLocalEnrolleeByUserId,
@@ -136,7 +137,9 @@ export const fetchEnrollees = async (): Promise<{
 };
 
 /**
- * Check if a user has already submitted an enrollment (prevent duplicate submissions)
+ * Check if a user has already submitted an enrollment (prevent duplicate submissions).
+ * Properly honors deletions in Supabase: if Supabase returns 0 records, local cache is pruned
+ * and { enrolled: false } is returned so the student can re-enroll.
  */
 export const checkUserAlreadyEnrolled = async (
   userId: string
@@ -152,10 +155,9 @@ export const checkUserAlreadyEnrolled = async (
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (!error && data) {
-        return {
-          enrolled: true,
-          enrollee: {
+      if (!error) {
+        if (data) {
+          const enrollee: Enrollee = {
             id: data.id,
             name: data.name,
             mcUsername: data.mc_username,
@@ -165,15 +167,35 @@ export const checkUserAlreadyEnrolled = async (
             status: data.status,
             notes: data.notes,
             userId: data.user_id,
-          },
-        };
+            avatarUrl: data.avatar_url,
+          };
+          addLocalEnrollee(enrollee);
+          return {
+            enrolled: true,
+            enrollee,
+          };
+        } else {
+          // Explicit confirmation from Supabase: record was deleted or does not exist!
+          removeLocalEnrolleeByUserId(userId);
+          return { enrolled: false };
+        }
+      }
+
+      // If table is missing, log warning
+      const isTableMissing =
+        error.code === 'PGRST205' ||
+        error.message?.includes('Could not find the table') ||
+        error.message?.includes('does not exist');
+
+      if (!isTableMissing) {
+        console.warn('Supabase check enrollment warning:', error.message);
       }
     } catch (err) {
       console.warn('Error checking existing enrollment in Supabase:', err);
     }
   }
 
-  // Fallback to local storage store
+  // Fallback to local storage store ONLY if Supabase is offline or not configured
   const existing = findLocalEnrolleeByUserId(userId);
   return { enrolled: !!existing, enrollee: existing };
 };
@@ -327,6 +349,41 @@ export const deleteEnrollee = async (
 
   // Always remove from local store so UI synchronizes
   removeLocalEnrollee(id);
+
+  // Broadcast event so StudentTerminal and other components immediately update
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('bakumon_enrollees_updated'));
+  }
+
+  return { success: true, warning: supabaseWarning };
+};
+
+/**
+ * DELETE an enrollee by userId (for withdraw/re-enroll from Student Terminal)
+ */
+export const deleteEnrolleeByUserId = async (
+  userId: string
+): Promise<{ success: boolean; warning?: string }> => {
+  const supabase = getSupabaseClient();
+  let supabaseWarning: string | undefined;
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('enrollees').delete().eq('user_id', userId);
+      if (error) {
+        supabaseWarning = error.message;
+      }
+    } catch (err: any) {
+      supabaseWarning = err?.message;
+    }
+  }
+
+  removeLocalEnrolleeByUserId(userId);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('bakumon_enrollees_updated'));
+  }
+
   return { success: true, warning: supabaseWarning };
 };
 
@@ -351,6 +408,11 @@ export const clearAllEnrollees = async (): Promise<{ success: boolean; warning?:
   }
 
   clearAllLocalEnrollees();
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('bakumon_enrollees_updated'));
+  }
+
   return { success: true, warning: supabaseWarning };
 };
 

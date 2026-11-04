@@ -52,7 +52,7 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="text-right font-mono text-[11px] text-slate-500">
-          <div>Powered by Google Sheets REST API & Unova C-Gear</div>
+          <div>Powered by Supabase PostgreSQL & Discord OAuth</div>
           <div className="mt-0.5">Non-commercial roleplay project. Pokémon © Nintendo / Game Freak.</div>
         </div>
       </div>
