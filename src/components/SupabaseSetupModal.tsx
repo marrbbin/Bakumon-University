@@ -403,15 +403,16 @@ using (true);
                   </div>
                   <div>
                     <label className="block text-slate-900 font-bold mb-1">
-                      Admin Role ID
+                      Teacher / Admin Role ID
                     </label>
                     <input
                       type="text"
                       value={adminRoleId}
                       onChange={(e) => setAdminRoleId(e.target.value)}
-                      placeholder="1567172563585597540"
+                      placeholder="1567172563585597540 (Teachers)"
                       className="w-full bg-white border-2 border-slate-900 p-2 font-mono text-xs shadow-[2px_2px_0_0_#0f172a] outline-hidden"
                     />
+                    <span className="text-[10px] text-slate-500 block mt-0.5">Named "Teachers" in Discord</span>
                   </div>
                 </div>
 
@@ -503,11 +504,11 @@ using (true);
 
                 <div className="p-3.5 bg-white border-2 border-slate-900 space-y-1.5 shadow-[2px_2px_0_0_#0f172a]">
                   <div className="flex items-center justify-between">
-                    <span className="font-pixel text-xs text-amber-900">3. ADMIN CLEARANCE</span>
-                    <span className="px-2 py-0.5 text-[10px] bg-amber-100 text-amber-900 font-bold">DISCORD ADMIN ROLE</span>
+                    <span className="font-pixel text-xs text-amber-900">3. TEACHER & ADMIN CLEARANCE</span>
+                    <span className="px-2 py-0.5 text-[10px] bg-amber-100 text-amber-900 font-bold">DISCORD "TEACHERS" ROLE</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    If the logged-in Discord member holds the <strong>Admin Role ID ({adminRoleId || 'Not configured'})</strong> or uses the Faculty Key, the Pokédex Registry unlocks with SELECT queries and programmatic SQL DELETE capabilities.
+                    If the logged-in Discord member holds the <strong>"Teachers" Role ID ({adminRoleId || '1567172563585597540'})</strong> or uses the Teacher Passcode, the Pokédex Registry unlocks with full SELECT queries and programmatic SQL DELETE capabilities.
                   </p>
                 </div>
               </div>

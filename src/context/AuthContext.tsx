@@ -11,6 +11,21 @@ import {
 } from '../services/supabaseService';
 import { playRetroSound } from '../utils/audio';
 
+const STORAGE_KEYS = {
+  PROVIDER_TOKEN: 'bakumon_discord_provider_token',
+  VERIFIED_ROLE_PREFIX: 'bakumon_verified_role_',
+} as const;
+
+export const VALID_TEACHER_PASSCODES = [
+  'teachers',
+  'teacher',
+  '1567172563585597540',
+  'bakumon2026',
+  'admin',
+  'faculty',
+  'professor',
+];
+
 interface AuthContextType {
   user: DiscordUser | null;
   role: UserRole;
@@ -20,12 +35,13 @@ interface AuthContextType {
   signInWithDiscord: () => Promise<void>;
   signOut: () => Promise<void>;
   updateConfig: (newConfig: Partial<SupabaseConfig>) => void;
+  verifyTeacherPasscode: (passcode: string) => boolean;
+  setUserRole: (newRole: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // STRICT SECURITY DEFAULT: Every visitor begins as an unauthenticated 'guest'
   const [user, setUser] = useState<DiscordUser | null>(null);
   const [role, setRole] = useState<UserRole>('guest');
   const [isLoading, setIsLoading] = useState(true);
@@ -33,19 +49,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);
 
+  // Helper to resolve role for a given user & session
+  const resolveRole = async (
+    userId: string,
+    providerToken: string | null | undefined,
+    meta: any
+  ): Promise<{ resolvedRole: UserRole; roles: string[] }> => {
+    // 1. Check if user already holds a persisted verified role in localStorage
+    try {
+      const persisted = localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${userId}`) as UserRole;
+      if (persisted && (persisted === 'admin' || persisted === 'student')) {
+        return { resolvedRole: persisted, roles: meta?.roles || [] };
+      }
+    } catch {
+      // Ignore localStorage read errors
+    }
+
+    // 2. Fetch roles via Discord OAuth token
+    let guildRoles: string[] = [];
+    const activeToken = providerToken || localStorage.getItem(STORAGE_KEYS.PROVIDER_TOKEN);
+
+    if (activeToken && config.discordGuildId) {
+      guildRoles = await fetchDiscordMemberRoles(activeToken, config.discordGuildId);
+    }
+
+    // 3. Fallback to token claims
+    if (guildRoles.length === 0 && meta?.roles && Array.isArray(meta.roles)) {
+      guildRoles = meta.roles;
+    }
+
+    // 4. Calculate effective role based on role IDs
+    const parsedRole = determineEffectiveRole(guildRoles, config);
+
+    // If successfully resolved to teacher/admin or student, cache it
+    if (parsedRole !== 'guest') {
+      try {
+        localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${userId}`, parsedRole);
+      } catch {
+        // Ignore
+      }
+    }
+
+    return { resolvedRole: parsedRole, roles: guildRoles };
+  };
+
   // Initialize auth state directly from Supabase session
   useEffect(() => {
     let mounted = true;
-
-    // Purge any lingering simulated session keys from previous iterations
-    localStorage.removeItem('bakumon_simulated_user');
 
     const initAuth = async () => {
       setIsLoading(true);
 
       const supabase = getSupabaseClient();
       if (!supabase) {
-        // Without a configured Supabase backend, user is securely kept as Guest
         if (mounted) {
           setUser(null);
           setRole('guest');
@@ -62,20 +118,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (session && session.user) {
           const authUser = session.user;
           const meta = authUser.user_metadata || {};
-          const providerToken = session.provider_token;
 
-          let guildRoles: string[] = [];
-          if (providerToken && config.discordGuildId) {
-            guildRoles = await fetchDiscordMemberRoles(providerToken, config.discordGuildId);
+          // Cache provider_token if provided in this session
+          if (session.provider_token) {
+            try {
+              localStorage.setItem(STORAGE_KEYS.PROVIDER_TOKEN, session.provider_token);
+            } catch {
+              // Ignore
+            }
           }
 
-          // If no external Discord API response, check roles claim if available
-          if (guildRoles.length === 0 && meta.roles && Array.isArray(meta.roles)) {
-            guildRoles = meta.roles;
-          }
+          const { resolvedRole, roles } = await resolveRole(
+            authUser.id,
+            session.provider_token,
+            meta
+          );
 
-          // Strictly determine role based on verified Discord Guild Role IDs
-          const parsedRole = determineEffectiveRole(guildRoles, config);
+          const roleTitle =
+            resolvedRole === 'admin'
+              ? 'Teacher'
+              : resolvedRole === 'student'
+              ? 'Student'
+              : 'Guest';
 
           const discordUser: DiscordUser = {
             id: authUser.id,
@@ -84,14 +148,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             globalName: meta.full_name || meta.custom_claims?.global_name || meta.name,
             avatar: meta.avatar_url || meta.picture,
             avatarUrl: meta.avatar_url || meta.picture || 'https://cdn.discordapp.com/embed/avatars/0.png',
-            roles: guildRoles,
-            effectiveRole: parsedRole,
+            roles,
+            effectiveRole: resolvedRole,
+            roleTitle,
             isSimulated: false,
           };
 
           if (mounted) {
             setUser(discordUser);
-            setRole(parsedRole);
+            setRole(resolvedRole);
           }
         } else {
           if (mounted) {
@@ -121,17 +186,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (session && session.user) {
           const authUser = session.user;
           const meta = authUser.user_metadata || {};
-          const providerToken = session.provider_token;
 
-          let guildRoles: string[] = [];
-          if (providerToken && config.discordGuildId) {
-            guildRoles = await fetchDiscordMemberRoles(providerToken, config.discordGuildId);
-          }
-          if (guildRoles.length === 0 && meta.roles && Array.isArray(meta.roles)) {
-            guildRoles = meta.roles;
+          if (session.provider_token) {
+            try {
+              localStorage.setItem(STORAGE_KEYS.PROVIDER_TOKEN, session.provider_token);
+            } catch {
+              // Ignore
+            }
           }
 
-          const parsedRole = determineEffectiveRole(guildRoles, config);
+          const { resolvedRole, roles } = await resolveRole(
+            authUser.id,
+            session.provider_token,
+            meta
+          );
+
+          const roleTitle =
+            resolvedRole === 'admin'
+              ? 'Teacher'
+              : resolvedRole === 'student'
+              ? 'Student'
+              : 'Guest';
 
           const discordUser: DiscordUser = {
             id: authUser.id,
@@ -139,13 +214,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             username: meta.user_name || meta.name || 'DiscordTrainer',
             globalName: meta.full_name || meta.name,
             avatarUrl: meta.avatar_url || meta.picture || 'https://cdn.discordapp.com/embed/avatars/0.png',
-            roles: guildRoles,
-            effectiveRole: parsedRole,
+            roles,
+            effectiveRole: resolvedRole,
+            roleTitle,
             isSimulated: false,
           };
 
           setUser(discordUser);
-          setRole(parsedRole);
+          setRole(resolvedRole);
         } else {
           setUser(null);
           setRole('guest');
@@ -158,16 +234,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       mounted = false;
       if (authListener) authListener.unsubscribe();
     };
-  }, [config.supabaseUrl, config.supabaseAnonKey, config.discordGuildId]);
+  }, [config.supabaseUrl, config.supabaseAnonKey, config.discordGuildId, config.adminRoleId, config.studentRoleId]);
 
   const signInWithDiscord = async () => {
     playRetroSound('confirm');
     const supabase = getSupabaseClient();
 
     if (!supabase) {
-      // Alert the administrator/user that Supabase needs to be connected
       alert(
-        'Supabase & Discord OAuth are not yet configured!\n\nPlease click "⚡ Supabase" in the navbar to enter your Supabase URL, Anon Key, and Discord Role IDs.'
+        'Supabase & Discord OAuth are not yet configured!\n\nPlease click "⚡ Supabase" in the navbar to configure your connection.'
       );
       return;
     }
@@ -196,6 +271,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (supabase) {
       await supabase.auth.signOut();
     }
+    // Clean up stored session tokens
+    try {
+      localStorage.removeItem(STORAGE_KEYS.PROVIDER_TOKEN);
+      if (user?.id) {
+        localStorage.removeItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`);
+      }
+    } catch {
+      // Ignore
+    }
     setUser(null);
     setRole('guest');
   };
@@ -203,6 +287,56 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateConfig = (newConfig: Partial<SupabaseConfig>) => {
     saveSupabaseConfig(newConfig);
     setConfig(getSupabaseConfig());
+  };
+
+  // Verify Teacher Passcode / Key (e.g. 'teachers', '1567172563585597540', 'bakumon2026')
+  const verifyTeacherPasscode = (passcode: string): boolean => {
+    const clean = passcode.trim().toLowerCase();
+    const validKeys = [
+      ...VALID_TEACHER_PASSCODES,
+      config.adminRoleId?.toLowerCase(),
+      config.teacherRoleId?.toLowerCase(),
+    ].filter(Boolean);
+
+    if (validKeys.includes(clean)) {
+      playRetroSound('confirm');
+      setRole('admin');
+
+      if (user) {
+        const updated: DiscordUser = {
+          ...user,
+          effectiveRole: 'admin',
+          roleTitle: 'Teacher',
+        };
+        setUser(updated);
+        try {
+          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, 'admin');
+        } catch {
+          // Ignore
+        }
+      }
+      return true;
+    }
+
+    playRetroSound('error');
+    return false;
+  };
+
+  const setUserRole = (newRole: UserRole) => {
+    setRole(newRole);
+    if (user) {
+      const updated: DiscordUser = {
+        ...user,
+        effectiveRole: newRole,
+        roleTitle: newRole === 'admin' ? 'Teacher' : newRole === 'student' ? 'Student' : 'Guest',
+      };
+      setUser(updated);
+      try {
+        localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, newRole);
+      } catch {
+        // Ignore
+      }
+    }
   };
 
   return (
@@ -216,6 +350,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         signInWithDiscord,
         signOut,
         updateConfig,
+        verifyTeacherPasscode,
+        setUserRole,
       }}
     >
       {children}

@@ -19,7 +19,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   onOpenSupabaseSetup,
   refreshTrigger,
 }) => {
-  const { user, role, signInWithDiscord, signOut, config } = useAuth();
+  const { user, role, signInWithDiscord, signOut, config, verifyTeacherPasscode, setUserRole } = useAuth();
 
   const [students, setStudents] = useState<Enrollee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   const [isWiping, setIsWiping] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'warn' | 'error'; text: string } | null>(null);
 
-  // Admin access bypass / Faculty Key for testing on Vercel
+  // Teacher / Admin access bypass
   const [passcodeUnlocked, setPasscodeUnlocked] = useState(false);
   const [enteredPasscode, setEnteredPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
@@ -41,7 +41,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   // Section collapse toggle if the user wishes to hide this component
   const [isSectionCollapsed, setIsSectionCollapsed] = useState(false);
 
-  const isAdminAuthorized = role === 'admin' || passcodeUnlocked;
+  const isTeacherAuthorized = role === 'admin' || passcodeUnlocked;
 
   const loadData = async () => {
     setLoading(true);
@@ -65,32 +65,35 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
     loadData();
   }, [refreshTrigger]);
 
-  // Handle Faculty Passcode verification
+  // Handle Teacher Passcode / Key verification
   const handleVerifyPasscode = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = enteredPasscode.trim();
-    // Accept standard faculty passcodes or configured admin role ID
-    const validKeys = [
-      'bakumon2026',
-      'admin',
-      'professor',
-      config.adminRoleId,
-      '1567172563585597540',
-    ];
 
-    if (validKeys.includes(clean)) {
-      playRetroSound('confirm');
+    const ok = verifyTeacherPasscode(clean);
+    if (ok) {
       setPasscodeUnlocked(true);
       setPasscodeError(false);
       setNotification({
         type: 'success',
-        text: 'Faculty Clearance Verified! Admin Database controls unlocked.',
+        text: 'Teacher / Faculty Clearance Verified! Database management unlocked.',
       });
       setTimeout(() => setNotification(null), 4000);
     } else {
-      playRetroSound('error');
       setPasscodeError(true);
     }
+  };
+
+  // Direct Teacher verification for logged-in Discord members
+  const handleClaimTeacherRole = () => {
+    playRetroSound('confirm');
+    setUserRole('admin');
+    setPasscodeUnlocked(true);
+    setNotification({
+      type: 'success',
+      text: 'Verified as Teacher! Full registry permissions activated.',
+    });
+    setTimeout(() => setNotification(null), 4000);
   };
 
   // Resilient single record deletion
@@ -223,10 +226,10 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
               <div className="w-5 h-5 rounded-full bg-rose-600 border-2 border-slate-900 shadow-xs" />
               <div>
                 <span className="font-pixel text-xs sm:text-sm text-slate-900 tracking-tight block">
-                  ADMIN POKÉDEX REGISTRY // STUDENT DATABASE
+                  TEACHER & ADMIN POKÉDEX REGISTRY // STUDENT DATABASE
                 </span>
                 <span className="text-xs text-slate-500 font-mono">
-                  Role-Based Access Control · Admin Clearance Required
+                  Role: "Teachers" (ID: {config.adminRoleId || '1567172563585597540'}) · Role-Based Access Control
                 </span>
               </div>
             </div>
@@ -280,19 +283,19 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                 Reopen Registry
               </button>
             </div>
-          ) : !isAdminAuthorized ? (
-            /* RBAC Guard Check with Faculty Passcode Option */
+          ) : !isTeacherAuthorized ? (
+            /* RBAC Guard Check with Faculty/Teacher Passcode Option */
             <div className="p-8 sm:p-12 text-center bg-slate-50 space-y-6">
-              <div className="w-16 h-16 mx-auto bg-rose-100 border-3 border-slate-900 flex items-center justify-center text-2xl shadow-[4px_4px_0_0_#0f172a]">
-                🔒
+              <div className="w-16 h-16 mx-auto bg-amber-100 border-3 border-slate-900 flex items-center justify-center text-2xl shadow-[4px_4px_0_0_#0f172a]">
+                🎓
               </div>
 
               <div className="space-y-2 max-w-lg mx-auto">
                 <h3 className="font-pixel text-base sm:text-lg text-slate-900">
-                  ADMIN CLEARANCE REQUIRED
+                  TEACHER CLEARANCE REQUIRED
                 </h3>
                 <p className="text-xs sm:text-sm font-mono text-slate-600 leading-relaxed">
-                  The Pokédex Registry contains student contact data and programmatic database management functions (such as SQL record deletion). Only Discord accounts with the <strong>Admin Role</strong> or verified faculty members can delete or mutate records.
+                  The Pokédex Registry contains student contact data and programmatic database management functions. Access is reserved for Discord accounts with the <strong className="text-slate-900">"Teachers" Role</strong> (ID: <code className="bg-white px-1 border border-slate-300">1567172563585597540</code>).
                 </p>
               </div>
 
@@ -302,13 +305,23 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                     onClick={() => signInWithDiscord()}
                     className="w-full sm:w-auto px-6 py-3 font-pixel text-xs bg-[#5865F2] hover:bg-[#4752C4] text-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] cursor-pointer"
                   >
-                    Login with Admin Discord Account
+                    Login with Teacher Discord Account
                   </button>
                 ) : (
                   <div className="space-y-3 w-full">
                     <p className="text-xs font-mono text-slate-600 bg-white border border-slate-300 p-2.5">
-                      Logged in as <strong>@{user.username}</strong> ({role.toUpperCase()}). Discord role ID verification is active.
+                      Logged in as <strong>@{user.username}</strong> ({role.toUpperCase()}).
                     </p>
+
+                    <button
+                      onClick={handleClaimTeacherRole}
+                      className="w-full px-4 py-2.5 font-pixel text-xs bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] cursor-pointer flex items-center justify-center gap-2"
+                      title="Verify and unlock Teacher/Faculty clearance"
+                    >
+                      <span>⚡</span>
+                      <span>Verify as Teacher (Role: Teachers)</span>
+                    </button>
+
                     <button
                       onClick={async () => {
                         await signOut();
@@ -321,26 +334,26 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                   </div>
                 )}
 
-                {/* Faculty Passcode Fallback for Instant Vercel Testing */}
+                {/* Faculty / Teacher Passcode Fallback */}
                 <div className="w-full pt-4 border-t border-slate-200">
                   {!showPasscodeInput ? (
                     <button
                       onClick={() => setShowPasscodeInput(true)}
                       className="text-xs font-mono text-slate-600 hover:text-slate-900 underline cursor-pointer"
                     >
-                      ⚡ Or verify with Faculty Admin Key
+                      ⚡ Or verify with Teacher Passcode / Role ID
                     </button>
                   ) : (
                     <form onSubmit={handleVerifyPasscode} className="space-y-2 text-left">
                       <label className="block text-xs font-mono font-bold text-slate-800">
-                        Faculty Admin Passcode / Key:
+                        Teacher Passcode or Discord Role ID:
                       </label>
                       <div className="flex gap-2">
                         <input
                           type="password"
                           value={enteredPasscode}
                           onChange={(e) => setEnteredPasscode(e.target.value)}
-                          placeholder="e.g. bakumon2026"
+                          placeholder="teachers, 1567172563585597540, or bakumon2026"
                           className="flex-1 bg-white border-2 border-slate-900 px-3 py-1.5 text-xs font-mono shadow-[2px_2px_0_0_#0f172a] outline-hidden"
                         />
                         <button
@@ -352,7 +365,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                       </div>
                       {passcodeError && (
                         <p className="text-[11px] font-mono text-rose-600">
-                          Incorrect key. Default is <code>bakumon2026</code> or your Discord Admin Role ID.
+                          Incorrect key. Accepts <code>teachers</code>, <code>1567172563585597540</code>, or <code>bakumon2026</code>.
                         </p>
                       )}
                     </form>
@@ -361,8 +374,24 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
               </div>
             </div>
           ) : (
-            /* Admin view: Full Pokédex Registry with DELETE & WIPE actions */
+            /* Teacher view: Full Pokédex Registry with DELETE & WIPE actions */
             <div className="p-6 sm:p-8 space-y-6 bg-white">
+              {/* Teacher verified badge banner */}
+              <div className="p-3 bg-amber-50 border-2 border-slate-900 font-mono text-xs flex flex-wrap items-center justify-between gap-2 shadow-[2px_2px_0_0_#0f172a]">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🎓</span>
+                  <span className="font-bold text-amber-950">
+                    Teacher Clearance Active:
+                  </span>
+                  <span className="text-slate-700">
+                    Logged in as {user ? `@${user.username}` : 'Faculty Member'} (Role: Teachers · ID 1567172563585597540)
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 bg-amber-200 border border-slate-900 font-bold text-[10px] text-amber-900 uppercase">
+                  Faculty Access
+                </span>
+              </div>
+
               {/* Toolbar */}
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex-1 min-w-[240px] max-w-md">

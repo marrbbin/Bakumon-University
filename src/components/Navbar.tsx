@@ -69,7 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSupabaseSetup }) => {
             onClick={() => playRetroSound('select')}
             className="hover:text-slate-900 transition-colors whitespace-nowrap flex items-center gap-1"
           >
-            <span>Admin Roster</span>
+            <span>Teacher Roster</span>
             {role === 'admin' && (
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             )}
@@ -157,7 +157,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSupabaseSetup }) => {
                       : 'bg-slate-300 text-slate-800'
                   }`}
                 >
-                  {role.toUpperCase()}
+                  {role === 'admin' ? 'TEACHER' : role.toUpperCase()}
                 </span>
               </div>
               <button

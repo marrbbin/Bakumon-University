@@ -391,7 +391,9 @@ export const fetchDiscordMemberRoles = async (
 };
 
 /**
- * Determine effective role (Admin, Student, Guest) from Discord roles list
+ * Determine effective role (Teacher/Admin, Student, Guest) from Discord roles list.
+ * Note: The Teacher role in the Discord server is ID 1567172563585597540,
+ * which grants the Teacher/Faculty administrative clearance ('admin').
  */
 export const determineEffectiveRole = (
   roleIds: string[],
@@ -399,16 +401,28 @@ export const determineEffectiveRole = (
 ): UserRole => {
   if (!roleIds || roleIds.length === 0) return 'guest';
 
-  // Check if user has Discord Admin role
-  if (config.adminRoleId && roleIds.includes(config.adminRoleId)) {
-    return 'admin';
+  // Check if user has Discord Teachers / Faculty / Admin role
+  const teacherRoleIds = [
+    config.adminRoleId,
+    config.teacherRoleId,
+    '1567172563585597540',
+  ].filter(Boolean);
+
+  if (teacherRoleIds.some((id) => roleIds.includes(id as string))) {
+    return 'admin'; // Grants Teacher/Faculty administrative clearance
   }
 
   // Check if user has Discord Student role
-  if (config.studentRoleId && roleIds.includes(config.studentRoleId)) {
+  const studentRoleIds = [
+    config.studentRoleId,
+    '1567172479808700536',
+  ].filter(Boolean);
+
+  if (studentRoleIds.some((id) => roleIds.includes(id as string))) {
     return 'student';
   }
 
   // If authenticated on Discord but lacking the server role, they remain a guest
   return 'guest';
 };
+

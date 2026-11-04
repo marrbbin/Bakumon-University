@@ -30,6 +30,7 @@ export interface DiscordUser {
   avatarUrl?: string;
   roles: string[]; // Guild role IDs
   effectiveRole: UserRole;
+  roleTitle?: string; // Display title: 'Teacher' | 'Student' | 'Guest'
   isSimulated?: boolean;
 }
 
@@ -38,7 +39,8 @@ export interface SupabaseConfig {
   supabaseAnonKey: string;
   discordGuildId: string;
   studentRoleId: string;
-  adminRoleId: string;
+  adminRoleId: string; // ID of Discord Teachers / Admin role (1567172563585597540)
+  teacherRoleId?: string; // Alias for adminRoleId
 }
 
 export interface CurriculumModule {
