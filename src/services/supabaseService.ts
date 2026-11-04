@@ -16,6 +16,65 @@ export { DEFAULT_INITIAL_STUDENTS };
 export const getLocalEnrollees = getLocalEnrolleesStore;
 export const saveLocalEnrollees = saveLocalEnrolleesStore;
 
+export interface SupabaseHealth {
+  connected: boolean;
+  tableExists: boolean;
+  message?: string;
+  code?: string;
+}
+
+/**
+ * Health check to verify whether Supabase client connects and the 'enrollees' table exists
+ */
+export const checkSupabaseHealth = async (): Promise<SupabaseHealth> => {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return {
+      connected: false,
+      tableExists: false,
+      message: 'Supabase client is not configured.',
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.from('enrollees').select('id').limit(1);
+    if (error) {
+      if (
+        error.code === 'PGRST205' ||
+        error.message?.includes('Could not find the table') ||
+        error.message?.includes('relation "enrollees" does not exist') ||
+        error.message?.includes('relation "public.enrollees" does not exist')
+      ) {
+        return {
+          connected: true,
+          tableExists: false,
+          code: error.code,
+          message: "Table 'public.enrollees' not found in Supabase schema cache. Run the SQL table creation script.",
+        };
+      }
+
+      return {
+        connected: false,
+        tableExists: false,
+        code: error.code,
+        message: error.message,
+      };
+    }
+
+    return {
+      connected: true,
+      tableExists: true,
+      message: "Supabase table 'public.enrollees' is active and reachable.",
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      tableExists: false,
+      message: err?.message || 'Network exception while connecting to Supabase.',
+    };
+  }
+};
+
 /**
  * Fetch all enrollees (SELECT * FROM enrollees)
  */
@@ -23,6 +82,7 @@ export const fetchEnrollees = async (): Promise<{
   data: Enrollee[];
   source: 'supabase' | 'local_storage';
   error?: string;
+  tableMissing?: boolean;
 }> => {
   const supabase = getSupabaseClient();
 
@@ -34,15 +94,21 @@ export const fetchEnrollees = async (): Promise<{
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.warn('Supabase SELECT error, falling back to local store:', error.message);
+        const isTableMissing =
+          error.code === 'PGRST205' ||
+          error.message?.includes('Could not find the table') ||
+          error.message?.includes('does not exist');
+
+        console.warn('Supabase SELECT notice:', error.message);
         return {
           data: getLocalEnrollees(),
           source: 'local_storage',
           error: error.message,
+          tableMissing: isTableMissing,
         };
       }
 
-      if (data && data.length > 0) {
+      if (data) {
         // Map postgres column names to Enrollee interface
         const mapped: Enrollee[] = data.map((row: any) => ({
           id: row.id || `BKU-${row.id_number || Math.floor(Math.random() * 9000 + 1000)}`,
@@ -114,6 +180,7 @@ export const checkUserAlreadyEnrolled = async (
 
 /**
  * INSERT a single data payload into Supabase & store
+ * Explicitly surfaces Supabase database failures instead of masking them.
  */
 export const insertEnrollee = async (payload: {
   name: string;
@@ -123,7 +190,13 @@ export const insertEnrollee = async (payload: {
   notes?: string;
   userId: string;
   avatarUrl?: string;
-}): Promise<{ success: boolean; data?: Enrollee; error?: string }> => {
+}): Promise<{
+  success: boolean;
+  data?: Enrollee;
+  error?: string;
+  tableMissing?: boolean;
+  savedToSupabase?: boolean;
+}> => {
   // Prevent duplicate submission check
   const duplicateCheck = await checkUserAlreadyEnrolled(payload.userId);
   if (duplicateCheck.enrolled) {
@@ -171,25 +244,59 @@ export const insertEnrollee = async (payload: {
         .single();
 
       if (error) {
-        console.warn('Supabase INSERT error, saving to local store:', error.message);
-      } else if (data) {
+        console.error('Supabase INSERT failed:', error);
+        // Also save to local store as a safety fallback
         addLocalEnrollee(newEnrollee);
-        return { success: true, data: newEnrollee };
+
+        const isTableMissing =
+          error.code === 'PGRST205' ||
+          error.message?.includes('Could not find the table') ||
+          error.message?.includes('does not exist');
+
+        if (isTableMissing) {
+          return {
+            success: false,
+            tableMissing: true,
+            error: "The table 'public.enrollees' does not exist in your Supabase project (awcbsdwbzzisyqqzdmgp). Please run the SQL setup script in your Supabase SQL Editor so submissions can be stored.",
+          };
+        }
+
+        return {
+          success: false,
+          error: `Supabase INSERT error (${error.code || 'FAIL'}): ${error.message}`,
+        };
+      }
+
+      if (data) {
+        // Successfully written to Supabase!
+        addLocalEnrollee(newEnrollee);
+        return {
+          success: true,
+          data: newEnrollee,
+          savedToSupabase: true,
+        };
       }
     } catch (err: any) {
-      console.warn('Error during Supabase insert:', err);
+      console.error('Error during Supabase insert:', err);
+      addLocalEnrollee(newEnrollee);
+      return {
+        success: false,
+        error: `Supabase Network Exception: ${err?.message || 'Failed to reach Supabase'}`,
+      };
     }
   }
 
-  // Always save to store
+  // Supabase not configured: local store only
   addLocalEnrollee(newEnrollee);
-  return { success: true, data: newEnrollee };
+  return {
+    success: true,
+    data: newEnrollee,
+    savedToSupabase: false,
+  };
 };
 
 /**
  * DELETE an enrollee by ID (Admin Role only)
- * Resilient implementation: deletes from Supabase if reachable, and ALWAYS
- * synchronizes the local store & UI state so records never get permanently stuck.
  */
 export const deleteEnrollee = async (
   id: string
@@ -201,8 +308,16 @@ export const deleteEnrollee = async (
     try {
       const { error } = await supabase.from('enrollees').delete().eq('id', id);
       if (error) {
-        console.warn('Supabase DELETE warning (will still remove from store):', error.message);
-        supabaseWarning = error.message;
+        if (
+          error.code === 'PGRST205' ||
+          error.message?.includes('Could not find the table') ||
+          error.message?.includes('does not exist')
+        ) {
+          supabaseWarning = "Table 'enrollees' not found in Supabase. Deleted from local cache.";
+        } else {
+          console.warn('Supabase DELETE warning:', error.message);
+          supabaseWarning = error.message;
+        }
       }
     } catch (err: any) {
       console.warn('Failed to delete on Supabase:', err);
@@ -210,7 +325,7 @@ export const deleteEnrollee = async (
     }
   }
 
-  // Always remove from store so the UI updates and persists cleanly
+  // Always remove from local store so UI synchronizes
   removeLocalEnrollee(id);
   return { success: true, warning: supabaseWarning };
 };

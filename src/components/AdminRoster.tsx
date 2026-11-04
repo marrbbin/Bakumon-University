@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Enrollee } from '../types';
-import { CAMPUS_ASSETS } from '../data/curriculumData';
 import {
   fetchEnrollees,
   deleteEnrollee,
@@ -25,6 +24,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   const [students, setStudents] = useState<Enrollee[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataSource, setDataSource] = useState<'supabase' | 'local_storage'>('local_storage');
+  const [tableMissing, setTableMissing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Enrollee | null>(null);
@@ -49,6 +49,11 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
       const res = await fetchEnrollees();
       setStudents(res.data);
       setDataSource(res.source);
+      if (res.tableMissing) {
+        setTableMissing(true);
+      } else if (res.source === 'supabase') {
+        setTableMissing(false);
+      }
     } catch (err) {
       console.error('Failed to load roster:', err);
     } finally {
@@ -106,7 +111,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
       if (result.warning) {
         setNotification({
           type: 'warn',
-          text: `Record ${targetId} (${targetName}) removed from active registry! (Supabase notice: ${result.warning})`,
+          text: `Record ${targetId} (${targetName}) removed from active registry! (Notice: ${result.warning})`,
         });
       } else {
         setNotification({
@@ -117,7 +122,6 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
       setTimeout(() => setNotification(null), 4000);
     } catch (err) {
       playRetroSound('confirm');
-      // Fallback cleanup
       setStudents((prev) => prev.filter((s) => s.id !== targetId));
       setNotification({
         type: 'warn',
@@ -142,7 +146,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
       setNotification({
         type: 'success',
         text: result.warning
-          ? `All student records cleared from registry! (Supabase notice: ${result.warning})`
+          ? `All student records cleared from registry! (Notice: ${result.warning})`
           : 'All student records have been permanently cleared from database.',
       });
       setTimeout(() => setNotification(null), 4000);
@@ -185,6 +189,32 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   return (
     <section id="admin-roster" className="py-20 px-4 sm:px-6 bg-white border-b-2 border-slate-900">
       <div className="max-w-7xl mx-auto">
+        {/* Table Missing Alert Banner */}
+        {tableMissing && (
+          <div className="mb-6 p-4 bg-amber-50 border-3 border-amber-600 shadow-[4px_4px_0_0_#0f172a] flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+            <div className="space-y-1">
+              <span className="font-bold text-amber-950 flex items-center gap-1.5 text-sm">
+                <span>⚠️</span>
+                <span>Supabase Table 'enrollees' Not Found in Your Project</span>
+              </span>
+              <p className="text-amber-900">
+                The database table has not been created yet in Supabase (<code className="bg-amber-200 px-1 font-bold">awcbsdwbzzisyqqzdmgp</code>). Live records and new student enrollments will not show in your Supabase dashboard until the SQL table script is run.
+              </p>
+            </div>
+            {onOpenSupabaseSetup && (
+              <button
+                onClick={() => {
+                  playRetroSound('select');
+                  onOpenSupabaseSetup();
+                }}
+                className="px-4 py-2 font-pixel text-xs pixel-btn-primary cursor-pointer whitespace-nowrap"
+              >
+                Open 1-Click SQL Script
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Pokédex Registry Header Box */}
         <div className="bg-white border-4 border-slate-900 shadow-[6px_6px_0_0_#0f172a] overflow-hidden mb-8">
           {/* Section Top Bar */}

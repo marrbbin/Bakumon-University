@@ -4,6 +4,8 @@ import { CAMPUS_ASSETS } from '../data/curriculumData';
 import {
   insertEnrollee,
   checkUserAlreadyEnrolled,
+  checkSupabaseHealth,
+  SupabaseHealth,
 } from '../services/supabaseService';
 import { MCPlayerHead } from './MCPlayerHead';
 import { playRetroSound } from '../utils/audio';
@@ -33,9 +35,20 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
   const [notes, setNotes] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error' | 'info' | 'warn';
+    text: string;
+    showSqlAction?: boolean;
+  } | null>(null);
   const [existingPass, setExistingPass] = useState<Enrollee | null>(null);
   const [terminalPower, setTerminalPower] = useState(true);
+
+  // Supabase Table Health status
+  const [dbHealth, setDbHealth] = useState<SupabaseHealth | null>(null);
+
+  useEffect(() => {
+    checkSupabaseHealth().then((h) => setDbHealth(h));
+  }, []);
 
   // Auto-fill Discord handle and name from active session
   useEffect(() => {
@@ -105,7 +118,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
         setExistingPass(result.data);
         setStatusMessage({
           type: 'success',
-          text: `Enrollment confirmed! Student ID: ${result.data.id} has been registered to your Discord UID.`,
+          text: `Enrollment confirmed! Student ID: ${result.data.id} has been registered and written to Supabase!`,
         });
         if (onEnrollmentComplete) {
           onEnrollmentComplete(result.data);
@@ -115,6 +128,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
         setStatusMessage({
           type: 'error',
           text: result.error || 'Failed to complete registration.',
+          showSqlAction: result.tableMissing,
         });
       }
     } catch (err: any) {
@@ -210,7 +224,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                         ENROLLMENT RECORD VERIFIED (ONE SUBMISSION PER USER)
                       </h4>
                       <p className="text-xs font-mono text-emerald-800">
-                        Your Discord UID is already linked to Student ID <strong>{existingPass.id}</strong>.
+                        Your Discord account is linked to Student ID <strong>{existingPass.id}</strong>.
                       </p>
                     </div>
                   </div>
@@ -296,15 +310,29 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
 
                     {statusMessage && (
                       <div
-                        className={`p-3 border-2 border-slate-900 text-xs font-mono shadow-[2px_2px_0_0_#0f172a] ${
+                        className={`p-3.5 border-2 border-slate-900 text-xs font-mono shadow-[2px_2px_0_0_#0f172a] space-y-2 ${
                           statusMessage.type === 'error'
-                            ? 'bg-rose-50 text-rose-800 border-rose-900'
+                            ? 'bg-rose-50 text-rose-900 border-rose-900'
                             : statusMessage.type === 'success'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-900'
-                            : 'bg-blue-50 text-blue-800 border-blue-900'
+                            ? 'bg-emerald-50 text-emerald-900 border-emerald-900'
+                            : 'bg-blue-50 text-blue-900 border-blue-900'
                         }`}
                       >
-                        {statusMessage.text}
+                        <p className="leading-relaxed">{statusMessage.text}</p>
+                        {statusMessage.showSqlAction && onOpenSupabaseSetup && (
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                playRetroSound('select');
+                                onOpenSupabaseSetup();
+                              }}
+                              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-pixel text-[11px] border border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                            >
+                              Open 1-Click SQL Script to Create Table
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -424,7 +452,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                     </div>
                   </form>
 
-                  {/* Right Column: Live Avatar & Role Card */}
+                  {/* Right Column: Live Avatar & Database Pipeline Card */}
                   <div className="lg:col-span-4 bg-slate-50 border-2 border-slate-900 p-5 shadow-[4px_4px_0_0_#0f172a] space-y-4">
                     <span className="font-pixel text-[11px] text-slate-900 block border-b border-slate-200 pb-2">
                       LIVE AVATAR PREVIEW
@@ -445,17 +473,37 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                       </div>
                     </div>
 
-                    <div className="p-3 bg-white border border-slate-300 text-xs font-mono space-y-1.5">
+                    <div className="p-3 bg-white border border-slate-300 text-xs font-mono space-y-2">
                       <span className="text-[10px] text-slate-500 block uppercase font-bold">
                         Database Pipeline
                       </span>
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                        <span className="text-slate-800">
-                          {isConfigured ? 'Supabase Postgres (Live)' : 'Local Simulator Mode'}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-700">Supabase Table:</span>
+                        {dbHealth?.tableExists ? (
+                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
+                            ✓ 'enrollees' Active
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 bg-rose-100 text-rose-800 text-[10px] font-bold border border-rose-300">
+                            ⚠️ Table Missing
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11px] text-slate-500 leading-tight">
+
+                      {!dbHealth?.tableExists && onOpenSupabaseSetup && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playRetroSound('select');
+                            onOpenSupabaseSetup();
+                          }}
+                          className="w-full text-left text-[11px] text-blue-700 hover:text-blue-900 underline font-bold cursor-pointer pt-1"
+                        >
+                          → Click here to create table via SQL
+                        </button>
+                      )}
+
+                      <p className="text-[10px] text-slate-500 leading-tight pt-1">
                         Unique constraint prevents duplicate submissions per Discord ID.
                       </p>
                     </div>

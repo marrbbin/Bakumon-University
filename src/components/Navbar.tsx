@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CAMPUS_ASSETS } from '../data/curriculumData';
 import { playRetroSound, toggleSound, isSoundMuted } from '../utils/audio';
 import { useAuth } from '../context/AuthContext';
+import { checkSupabaseHealth } from '../services/supabaseService';
 
 interface NavbarProps {
   onOpenSupabaseSetup: () => void;
@@ -9,7 +10,14 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenSupabaseSetup }) => {
   const [muted, setMuted] = useState(isSoundMuted());
+  const [isTableReady, setIsTableReady] = useState<boolean | null>(null);
   const { user, role, signInWithDiscord, signOut } = useAuth();
+
+  useEffect(() => {
+    checkSupabaseHealth().then((res) => {
+      setIsTableReady(res.tableExists);
+    });
+  }, []);
 
   const handleToggleSound = () => {
     const next = toggleSound();
@@ -87,17 +95,35 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSupabaseSetup }) => {
             {muted ? '🔇' : '🔊'}
           </button>
 
-          {/* Supabase & RLS Setup button */}
+          {/* Supabase & RLS Setup button with live health status */}
           <button
             onClick={() => {
               playRetroSound('select');
               onOpenSupabaseSetup();
             }}
-            className="px-2.5 py-1 text-xs font-mono font-bold text-slate-800 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border-2 border-slate-900 shadow-[1px_1px_0_0_#0f172a] transition-colors cursor-pointer flex items-center gap-1"
-            title="Configure Supabase Connection, PostgreSQL Schema & RLS"
+            className="px-2.5 py-1 text-xs font-mono font-bold text-slate-800 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border-2 border-slate-900 shadow-[1px_1px_0_0_#0f172a] transition-colors cursor-pointer flex items-center gap-1.5"
+            title={
+              isTableReady === true
+                ? "Supabase connected: Table 'enrollees' is active"
+                : isTableReady === false
+                ? "Notice: Table 'enrollees' not found in Supabase. Click to view SQL script."
+                : "Configure Supabase Backend & Schema"
+            }
           >
+            <span
+              className={`w-2 h-2 rounded-full border border-slate-900 ${
+                isTableReady === true
+                  ? 'bg-emerald-500'
+                  : isTableReady === false
+                  ? 'bg-amber-400 animate-pulse'
+                  : 'bg-slate-400'
+              }`}
+            />
             <span>⚡</span>
             <span className="hidden sm:inline">Supabase</span>
+            {isTableReady === false && (
+              <span className="text-[10px] text-amber-800 font-bold hidden md:inline">SQL Setup</span>
+            )}
           </button>
 
           {/* Real Discord Auth Button or Verified User Badge */}
