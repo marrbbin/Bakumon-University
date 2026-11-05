@@ -608,72 +608,39 @@ export const fetchDiscordMemberRoles = async (
 };
 
 /**
- * Determine effective role (Teacher/Admin, Student, Guest) from Discord roles list.
- * Note: The Teacher role in the Discord server is named "Teachers" with ID:
+ * Determine effective role (Teacher/Admin, Student, Guest) from Discord member role IDs.
+ * Note: The Teacher role in the Discord server is strictly verified via Role ID:
  * 1567172563585597540, which grants the Teacher/Faculty administrative clearance ('admin').
  *
- * This checks both raw Discord Snowflake IDs and role name strings (case-insensitive).
+ * Enforces strict Snowflake ID matching so student testers are NEVER elevated to Teacher.
  */
 export const determineEffectiveRole = (
-  roleIdsOrNames: string[],
-  config = getSupabaseConfig(),
-  userMetadata?: any
+  roleIds: string[],
+  config = getSupabaseConfig()
 ): UserRole => {
-  const list = [...(roleIdsOrNames || [])];
+  if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0) return 'guest';
 
-  // Also harvest any roles stored in userMetadata claims
-  if (userMetadata) {
-    if (Array.isArray(userMetadata.roles)) {
-      list.push(...userMetadata.roles);
-    }
-    if (Array.isArray(userMetadata.custom_claims?.roles)) {
-      list.push(...userMetadata.custom_claims.roles);
-    }
-    if (typeof userMetadata.role === 'string') {
-      list.push(userMetadata.role);
-    }
-  }
+  const cleanRoleIds = roleIds.map((id) => String(id).trim());
 
-  if (list.length === 0) return 'guest';
-
-  // Normalize all candidate strings to lowercase strings
-  const normalizedList = list.map((item) => String(item).trim().toLowerCase());
-
-  // Teacher / Admin identifiers (IDs & names)
-  const teacherIdentifiers = [
+  // 1. Strict Teacher Role Check: Must explicitly hold the Teachers Discord Snowflake ID
+  const teacherRoleIds = [
     '1567172563585597540',
-    config.adminRoleId?.toLowerCase(),
-    config.teacherRoleId?.toLowerCase(),
-    'teachers',
-    'teacher',
-    'admin',
-    'administrator',
-    'faculty',
-    'professor',
+    config.adminRoleId,
+    config.teacherRoleId,
   ].filter(Boolean) as string[];
 
-  const isTeacher = teacherIdentifiers.some((target) =>
-    normalizedList.includes(target)
-  );
-
+  const isTeacher = teacherRoleIds.some((targetId) => cleanRoleIds.includes(targetId));
   if (isTeacher) {
     return 'admin'; // Grants Teacher/Faculty administrative clearance
   }
 
-  // Student identifiers (IDs & names)
-  const studentIdentifiers = [
+  // 2. Student Role Check: Holds the Student Discord Snowflake ID
+  const studentRoleIds = [
     '1567172479808700536',
-    config.studentRoleId?.toLowerCase(),
-    'students',
-    'student',
-    'trainer',
-    'member',
+    config.studentRoleId,
   ].filter(Boolean) as string[];
 
-  const isStudent = studentIdentifiers.some((target) =>
-    normalizedList.includes(target)
-  );
-
+  const isStudent = studentRoleIds.some((targetId) => cleanRoleIds.includes(targetId));
   if (isStudent) {
     return 'student';
   }

@@ -20,7 +20,7 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
   onOpenSupabaseSetup,
   refreshTrigger,
 }) => {
-  const { user, role, signInWithDiscord, signOut, config, verifyTeacherPasscode, setUserRole } = useAuth();
+  const { user, role, signInWithDiscord, signOut, config, verifyTeacherPasscode } = useAuth();
 
   const [students, setStudents] = useState<Enrollee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,18 +84,6 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
     } else {
       setPasscodeError(true);
     }
-  };
-
-  // Direct Teacher verification for logged-in Discord members
-  const handleClaimTeacherRole = () => {
-    playRetroSound('confirm');
-    setUserRole('admin');
-    setPasscodeUnlocked(true);
-    setNotification({
-      type: 'success',
-      text: 'Verified as Teacher! Full registry permissions activated.',
-    });
-    setTimeout(() => setNotification(null), 4000);
   };
 
   // Resilient single record deletion
@@ -322,14 +310,9 @@ export const AdminRoster: React.FC<AdminRosterProps> = ({
                       Logged in as <strong>@{user.username}</strong> ({role.toUpperCase()}).
                     </p>
 
-                    <button
-                      onClick={handleClaimTeacherRole}
-                      className="w-full px-4 py-2.5 font-pixel text-xs bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 shadow-[2px_2px_0_0_#0f172a] cursor-pointer flex items-center justify-center gap-2"
-                      title="Verify and unlock Teacher/Faculty clearance"
-                    >
-                      <span>⚡</span>
-                      <span>Verify as Teacher (Role: Teachers)</span>
-                    </button>
+                    <p className="text-xs font-mono text-amber-800 bg-amber-50 border border-amber-300 p-2.5">
+                      Your Discord account does not have the <strong>"Teachers" role (ID: {config.adminRoleId || '1567172563585597540'})</strong> in the Discord server. You can sign in with a teacher account or enter the Faculty Passcode below.
+                    </p>
 
                     <button
                       onClick={async () => {

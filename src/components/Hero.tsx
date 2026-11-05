@@ -8,7 +8,7 @@ interface HeroProps {
 }
 
 export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
-  const { user, role, signInWithDiscord, signOut, setUserRole } = useAuth();
+  const { user, role, signInWithDiscord, signOut } = useAuth();
 
   const fullDialogue =
     "Hello there! Welcome to Bakumon University! Our academy was founded in Nawawa Region to teach the true science of Pokémon mechanics. Choose one or multiple majors that match your ambitions: Battling, Breeding, Brewing, or Berry Farming! Log in with your Discord account to enroll. Ready to begin?";
@@ -112,7 +112,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
                     <span>Login with Discord</span>
                   </button>
                   <p className="text-[11px] font-mono text-slate-500">
-                    Discord OAuth automatically parses your Guild Roles for Student or Admin clearance.
+                    🔒 Privacy safe: Verifies your @Student or @Teacher role in the official Bakumon server.
                   </p>
                 </div>
               ) : (
@@ -176,19 +176,6 @@ export const Hero: React.FC<HeroProps> = ({ onOpenSupabaseSetup }) => {
                         <span>Access Teacher Roster [Pokédex]</span>
                         <span>↓</span>
                       </a>
-                    )}
-                    {role !== 'admin' && (
-                      <button
-                        onClick={() => {
-                          playRetroSound('confirm');
-                          setUserRole('admin');
-                        }}
-                        className="px-3 py-2 text-xs font-mono font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 border border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer flex items-center gap-1.5"
-                        title="If your Discord account has the Teachers role (1567172563585597540)"
-                      >
-                        <span>⚡</span>
-                        <span>Verify as Teacher</span>
-                      </button>
                     )}
                     <a
                       href="#curriculum"

@@ -459,30 +459,124 @@ using (true);
           )}
 
           {activeTab === 'discord' && (
-            <div className="space-y-4 font-mono leading-relaxed">
-              <h4 className="font-bold text-slate-900 text-sm">
-                Configuring Discord OAuth in Supabase
-              </h4>
-              <ol className="list-decimal list-inside space-y-2 text-slate-700 pl-1">
-                <li>
-                  Go to <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">Discord Developer Portal</a> and select your application.
-                </li>
-                <li>
-                  Navigate to <strong>OAuth2 → General</strong>.
-                </li>
-                <li>
-                  Add Redirect URI: <br />
-                  <code className="bg-slate-100 border border-slate-300 px-2 py-0.5 text-rose-700 font-bold block mt-1">
-                    https://{supabaseUrl ? new URL(supabaseUrl || 'https://xyz.supabase.co').hostname : 'awcbsdwbzzisyqqzdmgp.supabase.co'}/auth/v1/callback
-                  </code>
-                </li>
-                <li>
-                  Copy your Discord <strong>Client ID</strong> and <strong>Client Secret</strong>.
-                </li>
-                <li>
-                  In your Supabase Dashboard, open <strong>Authentication → Providers → Discord</strong>, paste the credentials, and ensure scopes include: <code className="bg-slate-100 px-1 font-bold">identify email guilds guilds.members.read</code>.
-                </li>
-              </ol>
+            <div className="space-y-5 font-mono leading-relaxed">
+              {/* Suspicious Screen Explanation Banner */}
+              <div className="p-4 bg-amber-50 border-2 border-amber-600 text-amber-950 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm">
+                  <span>🛡️</span>
+                  <span>How to Make the Discord Authorization Screen Look Professional & Safe</span>
+                </div>
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  By default, an unconfigured Discord application has no icon, is called "BakumonU", and asks for invasive permissions like your email and all your servers. We have stripped the invasive scopes in the code. Follow the 2 steps below to make the screen look like an official, verified university portal!
+                </p>
+              </div>
+
+              {/* Step 1: Branding the Discord App in Developer Portal */}
+              <div className="p-4 bg-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-pixel text-xs text-slate-900">
+                    1. BRAND YOUR APPLICATION IN DISCORD DEVELOPER PORTAL
+                  </span>
+                  <span className="px-2 py-0.5 text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-400 font-bold">
+                    RECOMMENDED
+                  </span>
+                </div>
+
+                <ol className="list-decimal list-inside space-y-2 text-xs text-slate-700 pl-1">
+                  <li>
+                    Go to the{' '}
+                    <a
+                      href="https://discord.com/developers/applications"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-700 underline font-bold"
+                    >
+                      Discord Developer Portal →
+                    </a>{' '}
+                    and click on your app (currently named <strong>"BakumonU"</strong>).
+                  </li>
+                  <li>
+                    Under <strong>General Information</strong>:
+                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-slate-600">
+                      <li>
+                        <strong>App Name</strong>: Change from <code>BakumonU</code> to <strong className="text-slate-900 font-bold">Bakumon University</strong> (or <em>Bakumon University Portal</em>).
+                      </li>
+                      <li>
+                        <strong>App Icon</strong>: Click the circle and upload the official Bakumon Dragon Crest logo.
+                        <div className="mt-1 flex items-center gap-3 p-2 bg-slate-50 border border-slate-300">
+                          <img
+                            src="/assets/aistudio/LOGO_Bakumon_HD_643d55b9.webp"
+                            alt="Bakumon Logo"
+                            className="w-10 h-10 object-contain bg-white border border-slate-400 p-0.5"
+                          />
+                          <div className="text-[11px]">
+                            <span className="font-bold block text-slate-800">Bakumon University Official Crest</span>
+                            <a
+                              href="/assets/aistudio/LOGO_Bakumon_HD_643d55b9.webp"
+                              download="bakumon_university_icon.webp"
+                              target="_blank"
+                              className="text-blue-600 underline font-bold"
+                            >
+                              Download Icon File (WebP) →
+                            </a>
+                          </div>
+                        </div>
+                      </li>
+                      <li>
+                        <strong>Description</strong>: Add a short, reassuring description:
+                        <code className="block bg-slate-100 p-1.5 text-[11px] text-slate-800 border border-slate-300 mt-1 select-all">
+                          Official enrollment and student pass portal for the Bakumon University community.
+                        </code>
+                      </li>
+                    </ul>
+                  </li>
+                  <li>Click <strong>Save Changes</strong> at the bottom.</li>
+                </ol>
+              </div>
+
+              {/* Step 2: Minimal Scopes configured */}
+              <div className="p-4 bg-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] space-y-2.5">
+                <span className="font-pixel text-xs text-blue-600 block">
+                  2. PRIVACY-FRIENDLY SCOPES (AUTOMATICALLY UPDATED)
+                </span>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  We updated the app code so it <strong>NO LONGER</strong> asks for:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 bg-rose-50 border border-rose-300 text-rose-900">
+                    <span className="font-bold line-through">❌ Access your email address</span>
+                    <p className="text-[10px] text-rose-700 mt-0.5">Removed from app. Students no longer share their private emails.</p>
+                  </div>
+                  <div className="p-2 bg-rose-50 border border-rose-300 text-rose-900">
+                    <span className="font-bold line-through">❌ Know what servers you're in</span>
+                    <p className="text-[10px] text-rose-700 mt-0.5">Removed from app. Discord will never show this scary prompt.</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 pt-1">
+                  Now Discord will <strong>only</strong> ask to verify username/avatar and check if they belong to the Bakumon University server.
+                </p>
+              </div>
+
+              {/* Step 3: Redirect URI in Discord & Supabase */}
+              <div className="p-4 bg-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] space-y-2">
+                <span className="font-pixel text-xs text-slate-900 block">
+                  3. DISCORD OAUTH2 REDIRECT URI & SUPABASE
+                </span>
+                <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-700 pl-1">
+                  <li>
+                    In Discord Developer Portal under <strong>OAuth2 → General</strong>, make sure the Redirect URI is set to:
+                    <code className="block bg-slate-100 border border-slate-300 p-1.5 text-rose-700 font-bold text-[11px] select-all mt-1">
+                      https://awcbsdwbzzisyqqzdmgp.supabase.co/auth/v1/callback
+                    </code>
+                  </li>
+                  <li>
+                    In Supabase Dashboard under <strong>Authentication → Providers → Discord</strong>, paste your Client ID and Client Secret, and set Scopes to:
+                    <code className="block bg-slate-900 text-emerald-400 p-1.5 text-[11px] font-bold select-all mt-1">
+                      identify guilds.members.read
+                    </code>
+                  </li>
+                </ol>
+              </div>
             </div>
           )}
 

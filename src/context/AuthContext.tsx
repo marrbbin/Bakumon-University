@@ -26,6 +26,18 @@ export const VALID_TEACHER_PASSCODES = [
   'professor',
 ];
 
+export const VALID_STUDENT_PASSCODES = [
+  'student',
+  'students',
+  '1567172479808700536',
+  'bakumon',
+  'bakumon2026',
+  'nawawa',
+  'unova',
+  'enroll',
+  'enrollee',
+];
+
 interface AuthContextType {
   user: DiscordUser | null;
   role: UserRole;
@@ -36,6 +48,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateConfig: (newConfig: Partial<SupabaseConfig>) => void;
   verifyTeacherPasscode: (passcode: string) => boolean;
+  verifyStudentPasscode: (passcode: string, username?: string) => boolean;
   setUserRole: (newRole: UserRole) => void;
 }
 
@@ -54,39 +67,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);
 
-  // Helper to resolve role for a given user & session
+  // Clean up any stale global teacher elevation tokens from previous tests
+  useEffect(() => {
+    try {
+      localStorage.removeItem('bakumon_verified_role_global');
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  // Helper to resolve role strictly for a given user & session
   const resolveRole = async (
     userId: string,
     providerToken: string | null | undefined,
     meta: any,
     currentRole: UserRole
   ): Promise<{ resolvedRole: UserRole; roles: string[] }> => {
-    // 1. Check if user already holds a persisted verified role in localStorage
-    try {
-      const persistedUser = localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${userId}`) as UserRole;
-      const persistedDiscord = meta?.provider_id
-        ? (localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.provider_id}`) as UserRole)
-        : null;
-      const persistedSub = meta?.sub
-        ? (localStorage.getItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.sub}`) as UserRole)
-        : null;
-      const persistedGlobal = localStorage.getItem('bakumon_verified_role_global') as UserRole;
-
-      const persisted =
-        persistedUser ||
-        persistedDiscord ||
-        persistedSub ||
-        (currentRole === 'admin' ? 'admin' : null) ||
-        persistedGlobal;
-
-      if (persisted && (persisted === 'admin' || persisted === 'student')) {
-        return { resolvedRole: persisted, roles: meta?.roles || [] };
-      }
-    } catch {
-      // Ignore localStorage read errors
-    }
-
-    // 2. Fetch roles via Discord OAuth token
+    // 1. Fetch live member roles from Discord guild
     let guildRoles: string[] = [];
     const activeToken = providerToken || localStorage.getItem(STORAGE_KEYS.PROVIDER_TOKEN);
 
@@ -94,33 +91,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       guildRoles = await fetchDiscordMemberRoles(activeToken, config.discordGuildId);
     }
 
-    // 3. Fallback to token claims or metadata
-    if (guildRoles.length === 0 && meta?.roles && Array.isArray(meta.roles)) {
-      guildRoles = meta.roles;
-    }
+    // 2. Strict evaluation based on actual Discord Snowflake role IDs
+    let parsedRole = determineEffectiveRole(guildRoles, config);
 
-    // 4. Calculate effective role based on role IDs and names (checks '1567172563585597540' and 'Teachers')
-    let parsedRole = determineEffectiveRole(guildRoles, config, meta);
-
-    // CRITICAL: If the user was already verified as Teacher/Admin, never demote them to guest!
-    if (parsedRole === 'guest' && currentRole === 'admin') {
-      parsedRole = 'admin';
-    }
-
-    // If successfully resolved to teacher/admin or student, cache it in all identifiers
-    if (parsedRole !== 'guest') {
-      try {
-        localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${userId}`, parsedRole);
-        localStorage.setItem('bakumon_verified_role_global', parsedRole);
-        if (meta?.provider_id) {
-          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.provider_id}`, parsedRole);
-        }
-        if (meta?.sub) {
-          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${meta.sub}`, parsedRole);
-        }
-      } catch {
-        // Ignore
+    // 3. Check if user explicitly unlocked Teacher with Teacher Passcode in this browser session
+    try {
+      const sessionTeacher = sessionStorage.getItem(`bakumon_teacher_passcode_${userId}`);
+      if (sessionTeacher === 'admin') {
+        parsedRole = 'admin';
       }
+    } catch {
+      // Ignore
+    }
+
+    // 4. Check if student unlocked via student passcode in this browser session
+    try {
+      const sessionStudent = sessionStorage.getItem(`bakumon_student_passcode_${userId}`);
+      if (parsedRole === 'guest' && sessionStudent === 'student') {
+        parsedRole = 'student';
+      }
+    } catch {
+      // Ignore
     }
 
     return { resolvedRole: parsedRole, roles: guildRoles };
@@ -310,10 +301,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       // Clean origin without trailing slashes or URL query fragments
       const redirectUri = (typeof window !== 'undefined' ? window.location.origin : '').replace(/\/+$/, '');
+      // Only request minimal necessary scopes: username/avatar and member info in the Bakumon server.
+      // Removes invasive "email" and "guilds" (which triggers "Know what servers you're in" and makes users suspicious)
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
         options: {
-          scopes: 'identify email guilds guilds.members.read',
+          scopes: 'identify guilds.members.read',
           redirectTo: redirectUri,
         },
       });
@@ -339,6 +332,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.removeItem('bakumon_verified_role_global');
       if (user?.id) {
         localStorage.removeItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`);
+        sessionStorage.removeItem(`bakumon_teacher_passcode_${user.id}`);
+        sessionStorage.removeItem(`bakumon_student_passcode_${user.id}`);
       }
     } catch {
       // Ignore
@@ -367,9 +362,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       roleRef.current = 'admin';
       setRole('admin');
       try {
-        localStorage.setItem('bakumon_verified_role_global', 'admin');
         if (user?.id) {
-          localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, 'admin');
+          sessionStorage.setItem(`bakumon_teacher_passcode_${user.id}`, 'admin');
         }
       } catch {
         // Ignore
@@ -390,21 +384,56 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   };
 
+  // Verify Student Passcode / Key (e.g. '1567172479808700536', 'student', 'bakumon')
+  // Allows non-tech students or those who don't want to authorize Discord OAuth to unlock the Student PC
+  const verifyStudentPasscode = (passcode: string, username?: string): boolean => {
+    const clean = passcode.trim().toLowerCase();
+    const validKeys = [
+      ...VALID_STUDENT_PASSCODES,
+      config.studentRoleId?.toLowerCase(),
+    ].filter(Boolean);
+
+    if (validKeys.includes(clean)) {
+      playRetroSound('confirm');
+      roleRef.current = 'student';
+      setRole('student');
+      try {
+        if (user?.id) {
+          sessionStorage.setItem(`bakumon_student_passcode_${user.id}`, 'student');
+        }
+      } catch {
+        // Ignore
+      }
+
+      const activeName = username?.trim() || user?.username || 'StudentTrainer';
+      const cleanHandle = activeName.startsWith('@') ? activeName : `@${activeName}`;
+      const updated: DiscordUser = user
+        ? {
+            ...user,
+            effectiveRole: 'student',
+            roleTitle: 'Student',
+          }
+        : {
+            id: `student-${Date.now().toString(36)}`,
+            username: activeName.replace(/^@/, ''),
+            globalName: activeName.replace(/^@/, ''),
+            avatarUrl: 'https://cdn.discordapp.com/embed/avatars/0.png',
+            roles: [config.studentRoleId || '1567172479808700536'],
+            effectiveRole: 'student',
+            roleTitle: 'Student',
+            isSimulated: true,
+          };
+      setUser(updated);
+      return true;
+    }
+
+    playRetroSound('error');
+    return false;
+  };
+
   const setUserRole = (newRole: UserRole) => {
     roleRef.current = newRole;
     setRole(newRole);
-    try {
-      if (newRole !== 'guest') {
-        localStorage.setItem('bakumon_verified_role_global', newRole);
-      } else {
-        localStorage.removeItem('bakumon_verified_role_global');
-      }
-      if (user?.id) {
-        localStorage.setItem(`${STORAGE_KEYS.VERIFIED_ROLE_PREFIX}${user.id}`, newRole);
-      }
-    } catch {
-      // Ignore
-    }
     if (user) {
       const updated: DiscordUser = {
         ...user,
@@ -427,6 +456,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         signOut,
         updateConfig,
         verifyTeacherPasscode,
+        verifyStudentPasscode,
         setUserRole,
       }}
     >

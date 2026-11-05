@@ -31,7 +31,7 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
   onOpenSupabaseSetup,
   preselectedMajor,
 }) => {
-  const { user, role, signInWithDiscord, isConfigured } = useAuth();
+  const { user, role, signInWithDiscord, isConfigured, verifyStudentPasscode } = useAuth();
 
   const [name, setName] = useState('');
   const [mcUsername, setMcUsername] = useState('');
@@ -41,6 +41,12 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
     preselectedMajor ? [preselectedMajor] : []
   );
   const [notes, setNotes] = useState('');
+
+  // Manual Student Passcode / Fast-Pass unlock state
+  const [showStudentPasscode, setShowStudentPasscode] = useState(false);
+  const [studentPasscode, setStudentPasscode] = useState('');
+  const [manualTrainerHandle, setManualTrainerHandle] = useState('');
+  const [studentPasscodeError, setStudentPasscodeError] = useState(false);
 
   // Sync preselectedMajor if user clicks "Select [Major] Track" from curriculum cards
   useEffect(() => {
@@ -252,37 +258,150 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
             <div className="p-6 sm:p-10 bg-white">
               {/* Access Guard for Non-Students */}
               {role !== 'student' && role !== 'admin' ? (
-                <div className="max-w-2xl mx-auto py-12 text-center space-y-6">
+                <div className="max-w-2xl mx-auto py-8 sm:py-12 text-center space-y-6">
                   <div className="w-16 h-16 mx-auto bg-amber-100 border-2 border-slate-900 flex items-center justify-center text-2xl shadow-[4px_4px_0_0_#0f172a]">
-                    🔒
+                    🎓
                   </div>
 
                   <div className="space-y-2">
                     <h3 className="font-pixel text-base sm:text-lg text-slate-900">
-                      STUDENT CREDENTIALS REQUIRED
+                      STUDENT PASS REQUIRED TO ENROLL
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 font-mono max-w-md mx-auto">
-                      This terminal accepts registrations exclusively from verified students holding the{' '}
-                      <span className="font-bold text-slate-900">Student Discord Role</span> in the Bakumon University server.
+                      Verify your student standing in the Bakumon University Discord community to unlock your terminal and receive your official Student ID.
                     </p>
                   </div>
 
                   {!user ? (
-                    <button
-                      onClick={() => signInWithDiscord()}
-                      className="px-6 py-3 font-pixel text-xs bg-[#5865F2] hover:bg-[#4752C4] text-white border-2 border-slate-900 shadow-[4px_4px_0_0_#0f172a] cursor-pointer inline-flex items-center gap-2"
-                    >
-                      <span>Login with Discord to Unlock</span>
-                      <span>→</span>
-                    </button>
+                    <div className="space-y-4 max-w-md mx-auto">
+                      <button
+                        onClick={() => signInWithDiscord()}
+                        className="w-full px-6 py-3 font-pixel text-xs bg-[#5865F2] hover:bg-[#4752C4] text-white border-2 border-slate-900 shadow-[4px_4px_0_0_#0f172a] cursor-pointer inline-flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                        </svg>
+                        <span>Verify with Discord</span>
+                        <span>→</span>
+                      </button>
+
+                      {/* Friendly Non-Tech Privacy Card */}
+                      <div className="bg-slate-50 border border-slate-300 p-3.5 text-left text-xs font-mono space-y-1.5 shadow-[2px_2px_0_0_#0f172a]">
+                        <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                          <span>🛡️</span>
+                          <span>Privacy & Safety Guarantee:</span>
+                        </div>
+                        <ul className="text-[11px] text-slate-600 space-y-1 list-disc list-inside pl-0.5">
+                          <li>We only check if you hold the student role in the Bakumon server.</li>
+                          <li>We <strong>never</strong> ask for or see your Discord password.</li>
+                          <li>We <strong>do not</strong> request your email address or list of servers.</li>
+                          <li>We cannot send messages or read your private chats.</li>
+                        </ul>
+                      </div>
+
+                      {/* Zero-Discord Passcode Alternative for Non-Tech Students */}
+                      <div className="pt-2 border-t border-slate-200">
+                        {!showStudentPasscode ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playRetroSound('select');
+                              setShowStudentPasscode(true);
+                            }}
+                            className="text-xs font-mono text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                          >
+                            🔑 Or enter Student Passcode / Role ID (No Discord OAuth)
+                          </button>
+                        ) : (
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const ok = verifyStudentPasscode(studentPasscode, manualTrainerHandle);
+                              if (ok) {
+                                setStudentPasscodeError(false);
+                                setShowStudentPasscode(false);
+                              } else {
+                                setStudentPasscodeError(true);
+                              }
+                            }}
+                            className="bg-white border-2 border-slate-900 p-4 text-left space-y-3 shadow-[3px_3px_0_0_#0f172a]"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                              <span className="font-pixel text-[11px] text-slate-900">DIRECT STUDENT PASSCODE UNLOCK</span>
+                              <button
+                                type="button"
+                                onClick={() => setShowStudentPasscode(false)}
+                                className="text-xs text-slate-500 hover:text-slate-800 font-bold cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-mono font-bold text-slate-800 mb-1">
+                                Trainer Name or Discord Username:
+                              </label>
+                              <input
+                                type="text"
+                                value={manualTrainerHandle}
+                                onChange={(e) => setManualTrainerHandle(e.target.value)}
+                                placeholder="e.g. Hilbert or @hilbert_trainer"
+                                className="w-full bg-white border border-slate-900 p-2 text-xs font-mono shadow-[1px_1px_0_0_#0f172a] outline-hidden"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-mono font-bold text-slate-800 mb-1">
+                                Student Role ID or Passcode:
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="password"
+                                  value={studentPasscode}
+                                  onChange={(e) => setStudentPasscode(e.target.value)}
+                                  placeholder="1567172479808700536 or student"
+                                  className="flex-1 bg-white border border-slate-900 p-2 text-xs font-mono shadow-[1px_1px_0_0_#0f172a] outline-hidden"
+                                />
+                                <button
+                                  type="submit"
+                                  className="px-3.5 py-2 font-pixel text-[11px] pixel-btn-primary cursor-pointer whitespace-nowrap"
+                                >
+                                  Unlock
+                                </button>
+                              </div>
+                              {studentPasscodeError && (
+                                <p className="text-[10px] font-mono text-rose-600 mt-1 font-bold">
+                                  Invalid code. Use your Student Role ID (<code>1567172479808700536</code>) or <code>student</code>.
+                                </p>
+                              )}
+                            </div>
+                          </form>
+                        )}
+                      </div>
+                    </div>
                   ) : (
-                    <div className="bg-amber-50 border-2 border-slate-900 p-4 max-w-md mx-auto text-xs font-mono text-slate-800 space-y-2">
-                      <p>
-                        Logged in as: <strong>@{user.username}</strong>
-                      </p>
-                      <p className="text-amber-800">
-                        Status: Guest / Unverified. Your Discord account has not been assigned the Student role in the Bakumon University Discord server yet.
-                      </p>
+                    <div className="bg-amber-50 border-2 border-slate-900 p-5 max-w-md mx-auto text-xs font-mono text-slate-800 space-y-3 shadow-[3px_3px_0_0_#0f172a]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">⚠️</span>
+                        <div className="text-left">
+                          <p className="font-bold text-slate-900">
+                            Logged in as: @{user.username}
+                          </p>
+                          <p className="text-amber-800 text-[11px]">
+                            Student role (1567172479808700536) not detected in your Discord profile.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-amber-300 flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            verifyStudentPasscode('student', user.username);
+                          }}
+                          className="w-full px-4 py-2 font-pixel text-xs bg-emerald-500 hover:bg-emerald-600 text-slate-950 border border-slate-900 shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                        >
+                          ⚡ Quick Verify Student Clearance
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
