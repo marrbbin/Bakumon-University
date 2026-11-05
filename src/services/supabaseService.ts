@@ -13,22 +13,83 @@ import {
 } from '../store';
 
 /**
- * Resilient parser for majors from Postgres text[], JSON arrays, or comma-separated strings
+ * Clean any internal major tags stored inside notes if legacy table without 'majors' column was used
  */
-export const parseMajorsList = (val: any): SubjectType[] => {
-  if (Array.isArray(val) && val.length > 0) return val as SubjectType[];
+export const cleanNotesText = (notes?: string): string => {
+  if (!notes) return '';
+  return notes
+    .replace(/\|\s*\[MAJORS:\s*[^\]]+\]/gi, '')
+    .replace(/\[MAJORS:\s*[^\]]+\]/gi, '')
+    .trim();
+};
+
+/**
+ * Resilient parser for majors from Postgres text[], PostgreSQL literal strings (e.g. '{"Breeding","Brewing"}'),
+ * JSON arrays, comma-separated strings, notes fallback metadata, or cached local enrollees.
+ */
+export const parseMajorsList = (
+  val: any,
+  notesFallback?: string,
+  cachedFallback?: SubjectType[]
+): SubjectType[] => {
+  const VALID_MAJORS: SubjectType[] = ['Battling', 'Breeding', 'Brewing', 'Berry Farming'];
+
+  const sanitizeItem = (item: any): SubjectType | null => {
+    if (!item) return null;
+    const str = String(item).replace(/[{"}\\[\]]/g, '').trim();
+    const found = VALID_MAJORS.find((m) => m.toLowerCase() === str.toLowerCase());
+    return found || null;
+  };
+
+  // 1. Direct array
+  if (Array.isArray(val) && val.length > 0) {
+    const list = val.map(sanitizeItem).filter((m): m is SubjectType => m !== null);
+    if (list.length > 0) return Array.from(new Set(list));
+  }
+
+  // 2. String representation (Postgres array "{Breeding,Brewing}", JSON, comma-separated)
   if (typeof val === 'string' && val.trim()) {
     try {
       const parsed = JSON.parse(val);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed as SubjectType[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const list = parsed.map(sanitizeItem).filter((m): m is SubjectType => m !== null);
+        if (list.length > 0) return Array.from(new Set(list));
+      }
     } catch {
       // not JSON
     }
-    const split = val.split(',').map((s) => s.trim()).filter(Boolean);
-    if (split.length > 0) return split as SubjectType[];
+    // Clean PostgreSQL array curly braces and quotes
+    const cleanedStr = val.replace(/^[{\[\s"]+|[}\]\s"]+$/g, '');
+    const tokens = cleanedStr
+      .split(/[,\n|]+/)
+      .map(sanitizeItem)
+      .filter((m): m is SubjectType => m !== null);
+    if (tokens.length > 0) return Array.from(new Set(tokens));
   }
+
+  // 3. Check if encoded in notes fallback (e.g. "[MAJORS: Breeding, Brewing]")
+  if (typeof notesFallback === 'string') {
+    const match =
+      notesFallback.match(/\[MAJORS:\s*([^\]]+)\]/i) ||
+      notesFallback.match(/Majors:\s*([^\n|]+)/i);
+    if (match && match[1]) {
+      const extracted = match[1]
+        .split(',')
+        .map(sanitizeItem)
+        .filter((m): m is SubjectType => m !== null);
+      if (extracted.length > 0) return Array.from(new Set(extracted));
+    }
+  }
+
+  // 4. Cached fallback if available
+  if (cachedFallback && Array.isArray(cachedFallback) && cachedFallback.length > 0) {
+    const valid = cachedFallback.map(sanitizeItem).filter((m): m is SubjectType => m !== null);
+    if (valid.length > 0) return Array.from(new Set(valid));
+  }
+
   return ['Battling'];
 };
+
 
 
 // Re-export for compatibility
@@ -136,10 +197,10 @@ export const fetchEnrollees = async (): Promise<{
           mcUsername: row.mc_username || row.mcUsername,
           handle: row.discord_handle || row.handle || '@trainer',
           experienceLevel: row.experience_level || row.experienceLevel || 'Beginner (Fresh out of Nuvema)',
-          majors: parseMajorsList(row.majors),
+          majors: parseMajorsList(row.majors, row.notes),
           timestamp: row.created_at ? new Date(row.created_at).toLocaleString() : row.timestamp || new Date().toLocaleString(),
           status: row.status || 'Enrolled',
-          notes: row.notes || '',
+          notes: cleanNotesText(row.notes),
           userId: row.user_id || row.userId,
           avatarUrl: row.avatar_url,
         }));
@@ -177,16 +238,19 @@ export const checkUserAlreadyEnrolled = async (
 
       if (!error) {
         if (data) {
+          const existingLocal = findLocalEnrolleeByUserId(userId);
+          const resolvedMajors = parseMajorsList(data.majors, data.notes, existingLocal?.majors);
+
           const enrollee: Enrollee = {
             id: data.id,
             name: data.name,
             mcUsername: data.mc_username,
             handle: data.discord_handle,
             experienceLevel: data.experience_level,
-            majors: parseMajorsList(data.majors),
+            majors: resolvedMajors,
             timestamp: new Date(data.created_at || Date.now()).toLocaleString(),
             status: data.status,
-            notes: data.notes,
+            notes: cleanNotesText(data.notes),
             userId: data.user_id,
             avatarUrl: data.avatar_url,
           };
@@ -292,10 +356,15 @@ export const insertEnrollee = async (payload: {
         .select()
         .single();
 
-      // If error is specifically that the "majors" column does not exist on legacy tables, retry without it
+      // If error is specifically that the "majors" column does not exist on legacy tables, retry with majors embedded in notes
       if (error && (error.message?.includes('column "majors"') || error.message?.includes("'majors' column"))) {
-        console.warn('Notice: majors column not yet created in Supabase schema. Inserting without majors column...');
+        console.warn('Notice: majors column not yet created in Supabase schema. Preserving majors in notes metadata...');
         delete insertRecord.majors;
+        const majorsTag = `[MAJORS: ${chosenMajors.join(', ')}]`;
+        insertRecord.notes = payload.notes?.trim()
+          ? `${payload.notes.trim()} | ${majorsTag}`
+          : majorsTag;
+
         const retryResult = await supabase
           .from('enrollees')
           .insert([insertRecord])

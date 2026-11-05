@@ -308,11 +308,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
+      // Clean origin without trailing slashes or URL query fragments
+      const redirectUri = (typeof window !== 'undefined' ? window.location.origin : '').replace(/\/+$/, '');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
         options: {
           scopes: 'identify email guilds guilds.members.read',
-          redirectTo: window.location.origin,
+          redirectTo: redirectUri,
         },
       });
 

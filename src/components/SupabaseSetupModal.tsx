@@ -7,7 +7,7 @@ import { checkSupabaseHealth, SupabaseHealth } from '../services/supabaseService
 interface SupabaseSetupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultTab?: 'config' | 'sql' | 'discord' | 'security';
+  defaultTab?: 'config' | 'sql' | 'discord' | 'security' | 'vercel';
 }
 
 export const SupabaseSetupModal: React.FC<SupabaseSetupModalProps> = ({
@@ -23,7 +23,7 @@ export const SupabaseSetupModal: React.FC<SupabaseSetupModalProps> = ({
   const [studentRoleId, setStudentRoleId] = useState(config.studentRoleId);
   const [adminRoleId, setAdminRoleId] = useState(config.adminRoleId);
 
-  const [activeTab, setActiveTab] = useState<'config' | 'sql' | 'discord' | 'security'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'config' | 'sql' | 'discord' | 'security' | 'vercel'>(defaultTab);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -259,6 +259,19 @@ using (true);
             }`}
           >
             🔒 RBAC Security
+          </button>
+          <button
+            onClick={() => {
+              playRetroSound('select');
+              setActiveTab('vercel');
+            }}
+            className={`px-3.5 py-2 border-t-2 border-x-2 font-bold cursor-pointer ${
+              activeTab === 'vercel'
+                ? 'bg-white border-slate-900 text-slate-900 -mb-[2px] pb-[10px]'
+                : 'bg-slate-100 border-transparent text-slate-600'
+            }`}
+          >
+            🚀 Vercel Login Fix
           </button>
         </div>
 
@@ -514,6 +527,108 @@ using (true);
                     If the logged-in Discord member holds the <strong>"Teachers" Role ID ({adminRoleId || '1567172563585597540'})</strong> or uses the Teacher Passcode, the Pokédex Registry unlocks with full SELECT queries and programmatic SQL DELETE capabilities.
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'vercel' && (
+            <div className="space-y-4 font-mono leading-relaxed">
+              {/* Alert header box */}
+              <div className="p-4 bg-rose-50 border-2 border-rose-600 text-rose-950 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm">
+                  <span>🚨</span>
+                  <span>Why Vercel Asks Students to "Log In or Create an Account"</span>
+                </div>
+                <p className="text-xs text-rose-900 leading-relaxed">
+                  Vercel projects have a security feature called <strong>"Deployment Protection" (Vercel Authentication)</strong> enabled by default. Because you are already logged in to Vercel on your development computer, you can view the site normally. However, when students or other devices visit the URL or complete Discord OAuth, Vercel intercepts them with a <strong>"Log in with Vercel or create an account"</strong> login wall.
+                </p>
+              </div>
+
+              {/* Step 1: Turn off Vercel Authentication */}
+              <div className="p-4 bg-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-pixel text-xs text-rose-600">STEP 1: DISABLE VERCEL AUTHENTICATION (20 SECONDS)</span>
+                  <span className="px-2 py-0.5 text-[10px] bg-rose-100 text-rose-900 border border-rose-400 font-bold">REQUIRED</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-700 pl-1">
+                  <li>
+                    Open your project in the{' '}
+                    <a
+                      href="https://vercel.com/dashboard"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-700 underline font-bold"
+                    >
+                      Vercel Dashboard →
+                    </a>
+                  </li>
+                  <li>Click on your Bakumon University project.</li>
+                  <li>
+                    Go to <strong>Settings</strong> (top navigation) → <strong>Deployment Protection</strong> (left sidebar).
+                  </li>
+                  <li>
+                    Under <strong>"Vercel Authentication"</strong>, toggle or change the setting to <strong>Disabled</strong> (or turn off protection for Production & Preview deployments).
+                  </li>
+                  <li>If <strong>Password Protection</strong> is toggled on, ensure it is also set to <strong>Disabled</strong>.</li>
+                  <li>Click <strong>Save</strong> at the bottom of the section.</li>
+                </ol>
+                <div className="p-2 bg-emerald-50 border border-emerald-400 text-emerald-900 text-[11px] font-bold">
+                  ✓ Once disabled, any student on any device can visit and log in without needing a Vercel account!
+                </div>
+              </div>
+
+              {/* Step 2: Configure Supabase Redirect URLs */}
+              <div className="p-4 bg-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-pixel text-xs text-blue-600">STEP 2: CONFIGURE SUPABASE URL CONFIGURATION</span>
+                  <span className="px-2 py-0.5 text-[10px] bg-blue-100 text-blue-900 border border-blue-400 font-bold">REQUIRED FOR OAUTH</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-700 pl-1">
+                  <li>
+                    Open your Supabase project:{' '}
+                    <a
+                      href={`https://supabase.com/dashboard/project/${config.supabaseUrl.replace('https://', '').split('.')[0] || 'awcbsdwbzzisyqqzdmgp'}/auth/url-configuration`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-700 underline font-bold"
+                    >
+                      Supabase URL Configuration →
+                    </a>
+                  </li>
+                  <li>
+                    Set <strong>Site URL</strong> to your primary production domain (e.g.{' '}
+                    <code className="bg-slate-100 px-1 border border-slate-300 font-bold">https://your-project.vercel.app</code>
+                    ). Do not use a branch preview URL with random commit hashes.
+                  </li>
+                  <li>
+                    Under <strong>Redirect URLs</strong>, add the following wildcard patterns:
+                    <div className="mt-1 space-y-1">
+                      <code className="block bg-slate-900 text-emerald-400 p-1.5 text-[11px] select-all">
+                        https://*.vercel.app/**
+                      </code>
+                      <code className="block bg-slate-900 text-emerald-400 p-1.5 text-[11px] select-all">
+                        https://*.vercel.app
+                      </code>
+                      <code className="block bg-slate-900 text-emerald-400 p-1.5 text-[11px] select-all">
+                        http://localhost:3000
+                      </code>
+                    </div>
+                  </li>
+                  <li>Click <strong>Save</strong>.</li>
+                </ol>
+              </div>
+
+              {/* Step 3: Discord Developer Portal Redirect URL */}
+              <div className="p-4 bg-white border-2 border-slate-900 shadow-[3px_3px_0_0_#0f172a] space-y-2">
+                <span className="font-pixel text-xs text-slate-900 block">
+                  STEP 3: VERIFY DISCORD DEVELOPER PORTAL REDIRECT
+                </span>
+                <p className="text-xs text-slate-600">
+                  In your <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer" className="text-blue-700 underline font-bold">Discord Developer Portal</a> under <strong>OAuth2 → General</strong>, make sure your Redirect URI points directly to Supabase's callback handler:
+                </p>
+                <code className="block bg-slate-100 border border-slate-300 p-2 text-rose-700 font-bold text-[11px] select-all">
+                  https://awcbsdwbzzisyqqzdmgp.supabase.co/auth/v1/callback
+                </code>
               </div>
             </div>
           )}

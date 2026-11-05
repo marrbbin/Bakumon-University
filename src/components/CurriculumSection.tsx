@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CURRICULUM_SUBJECTS } from '../data/curriculumData';
-import { CurriculumSubject, SubjectType } from '../types';
-import { CurriculumModal } from './CurriculumModal';
+import { SubjectType } from '../types';
 import { playRetroSound } from '../utils/audio';
 
 interface CurriculumSectionProps {
@@ -11,19 +10,6 @@ interface CurriculumSectionProps {
 export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
   onGoToEnrollment,
 }) => {
-  const [activeModalSubject, setActiveModalSubject] = useState<CurriculumSubject | null>(null);
-
-  const handleOpenSubject = (subject: CurriculumSubject) => {
-    playRetroSound('select');
-    setActiveModalSubject(subject);
-  };
-
-  const handleEnrollFromModal = () => {
-    const majorId = activeModalSubject?.id;
-    setActiveModalSubject(null);
-    onGoToEnrollment(majorId);
-  };
-
   return (
     <section id="curriculum" className="py-20 px-4 sm:px-6 bg-white border-b-2 border-slate-900">
       <div className="max-w-7xl mx-auto">
@@ -52,7 +38,13 @@ export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
             className="group relative bg-white border-2 border-slate-900 shadow-[4px_4px_0_0_#0f172a] hover:shadow-[6px_6px_0_0_#0f172a] transition-all duration-150 flex flex-col justify-between overflow-hidden"
           >
             {/* Top Image Banner */}
-            <div className="relative aspect-16/10 w-full overflow-hidden bg-slate-100 border-b-2 border-slate-900">
+            <div 
+              onClick={() => {
+                playRetroSound('select');
+                onGoToEnrollment(subject.id);
+              }}
+              className="relative aspect-16/10 w-full overflow-hidden bg-slate-100 border-b-2 border-slate-900 cursor-pointer"
+            >
               <img
                 src={subject.image}
                 alt={subject.title}
@@ -104,20 +96,18 @@ export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
 
               {/* Card CTA */}
               <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
+                <span className="text-xs font-mono text-slate-500">
+                  Faculty: <strong className="text-slate-800">{subject.instructor}</strong>
+                </span>
                 <button
-                  onClick={() => handleOpenSubject(subject)}
-                  className="px-3.5 py-2 text-xs font-semibold pixel-btn-secondary cursor-pointer"
-                >
-                  Explore Lab & Syllabus
-                </button>
-                <button
+                  type="button"
                   onClick={() => {
                     playRetroSound('confirm');
                     onGoToEnrollment(subject.id);
                   }}
-                  className="px-3.5 py-2 text-xs font-pixel pixel-btn-primary cursor-pointer flex items-center gap-1"
+                  className="px-4 py-2 text-xs font-pixel pixel-btn-primary cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>Enroll with {subject.id}</span>
+                  <span>Select {subject.id} Track</span>
                   <span>→</span>
                 </button>
               </div>
@@ -126,13 +116,6 @@ export const CurriculumSection: React.FC<CurriculumSectionProps> = ({
         ))}
       </div>
       </div>
-
-      {/* Modal Drill-Down */}
-      <CurriculumModal
-        subject={activeModalSubject}
-        onClose={() => setActiveModalSubject(null)}
-        onGoToEnrollment={handleEnrollFromModal}
-      />
     </section>
   );
 };

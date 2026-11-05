@@ -7,6 +7,8 @@ import {
   deleteEnrolleeByUserId,
   checkSupabaseHealth,
   SupabaseHealth,
+  parseMajorsList,
+  cleanNotesText,
 } from '../services/supabaseService';
 import { MCPlayerHead } from './MCPlayerHead';
 import { playRetroSound } from '../utils/audio';
@@ -35,13 +37,15 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
   const [mcUsername, setMcUsername] = useState('');
   const [discordHandle, setDiscordHandle] = useState('');
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>(EXPERIENCE_OPTIONS[0]);
-  const [selectedMajors, setSelectedMajors] = useState<SubjectType[]>(['Battling']);
+  const [selectedMajors, setSelectedMajors] = useState<SubjectType[]>(
+    preselectedMajor ? [preselectedMajor] : []
+  );
   const [notes, setNotes] = useState('');
 
-  // Sync preselectedMajor if user clicks "Enroll with this Major" from curriculum cards
+  // Sync preselectedMajor if user clicks "Select [Major] Track" from curriculum cards
   useEffect(() => {
     if (preselectedMajor) {
-      setSelectedMajors((prev) => (prev.includes(preselectedMajor) ? prev : [...prev, preselectedMajor]));
+      setSelectedMajors([preselectedMajor]);
     }
   }, [preselectedMajor]);
 
@@ -118,16 +122,9 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
 
   const handleToggleMajor = (majorId: SubjectType) => {
     playRetroSound('select');
-    setSelectedMajors((prev) => {
-      if (prev.includes(majorId)) {
-        if (prev.length <= 1) {
-          return prev; // keep at least 1 major selected
-        }
-        return prev.filter((m) => m !== majorId);
-      } else {
-        return [...prev, majorId];
-      }
-    });
+    setSelectedMajors((prev) =>
+      prev.includes(majorId) ? prev.filter((m) => m !== majorId) : [...prev, majorId]
+    );
   };
 
   const handleSelectAllMajors = () => {
@@ -135,9 +132,9 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
     setSelectedMajors(['Battling', 'Breeding', 'Brewing', 'Berry Farming']);
   };
 
-  const handleResetSingleMajor = (majorId: SubjectType = 'Battling') => {
+  const handleClearMajors = () => {
     playRetroSound('select');
-    setSelectedMajors([majorId]);
+    setSelectedMajors([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -358,10 +355,10 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[10px]">
-                            DECLARED MAJOR TRACK(S) ({existingPass.majors?.length || 1})
+                            DECLARED MAJOR TRACK(S) ({parseMajorsList(existingPass.majors, existingPass.notes).length})
                           </span>
                           <div className="flex flex-wrap gap-1.5 mt-1">
-                            {(existingPass.majors && existingPass.majors.length > 0 ? existingPass.majors : ['Battling']).map((m) => {
+                            {parseMajorsList(existingPass.majors, existingPass.notes).map((m) => {
                               const majorConfig = AVAILABLE_MAJORS.find((opt) => opt.id === m);
                               return (
                                 <span
@@ -377,10 +374,10 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                             })}
                           </div>
                         </div>
-                        {existingPass.notes && (
+                        {cleanNotesText(existingPass.notes) && (
                           <div>
                             <span className="text-slate-400 block text-[10px]">STUDENT AMBITION / NOTES</span>
-                            <p className="text-slate-700 italic text-[11px]">{existingPass.notes}</p>
+                            <p className="text-slate-700 italic text-[11px]">{cleanNotesText(existingPass.notes)}</p>
                           </div>
                         )}
                       </div>
@@ -561,19 +558,26 @@ export const StudentTerminal: React.FC<StudentTerminalProps> = ({
                           <button
                             type="button"
                             onClick={handleSelectAllMajors}
-                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-900 text-slate-800 font-bold shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-900 text-slate-800 font-bold shadow-[1px_1px_0_0_#0f172a] cursor-pointer"
                           >
                             ✓ Select All 4
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleResetSingleMajor('Battling')}
-                            className="px-2 py-0.5 bg-white hover:bg-slate-100 border border-slate-400 text-slate-600 font-medium cursor-pointer"
+                            onClick={handleClearMajors}
+                            className="px-2.5 py-1 bg-white hover:bg-rose-50 border border-slate-400 text-slate-700 font-medium cursor-pointer"
                           >
-                            Single Major Only
+                            ✕ Clear Selection
                           </button>
                         </div>
                       </div>
+
+                      {selectedMajors.length === 0 && (
+                        <div className="text-[11px] font-mono text-amber-900 bg-amber-50 border-2 border-amber-400 p-2.5 font-bold shadow-[2px_2px_0_0_#0f172a] flex items-center gap-2">
+                          <span>⚠️</span>
+                          <span>Click any major card below to pick your disciplines (e.g. Breeding & Genetics, Alchemical Brewing).</span>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {AVAILABLE_MAJORS.map((major) => {
