@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Enrollee } from '../types';
-import { CAMPUS_ASSETS } from '../data/curriculumData';
+import { CAMPUS_ASSETS, AVAILABLE_MAJORS } from '../data/curriculumData';
 import { fetchEnrollees } from '../services/sheetService';
 import { MCPlayerHead } from './MCPlayerHead';
 import { playRetroSound } from '../utils/audio';
@@ -171,9 +171,26 @@ export const LiveRoster: React.FC<LiveRosterProps> = ({
                     </div>
                   </div>
 
+                  {/* Declared Major Badges */}
+                  <div className="flex flex-wrap gap-1 mt-2.5">
+                    {(student.majors && student.majors.length > 0 ? student.majors : ['Battling']).map((m) => {
+                      const cfg = AVAILABLE_MAJORS.find((opt) => opt.id === m);
+                      return (
+                        <span
+                          key={m}
+                          className={`px-1.5 py-0.5 text-[10px] font-mono font-bold border border-slate-900 shadow-[1px_1px_0_0_#0f172a] ${
+                            cfg?.badgeClass || 'bg-slate-100 text-slate-800'
+                          }`}
+                        >
+                          {cfg?.icon} {m}
+                        </span>
+                      );
+                    })}
+                  </div>
+
                   {/* Notes (if any) */}
                   {student.notes && (
-                    <p className="text-[11px] text-slate-600 italic line-clamp-2 bg-slate-50 p-2 border border-slate-200">
+                    <p className="text-[11px] text-slate-600 italic line-clamp-2 bg-slate-50 p-2 border border-slate-200 mt-2">
                       "{student.notes}"
                     </p>
                   )}
@@ -242,6 +259,27 @@ export const LiveRoster: React.FC<LiveRosterProps> = ({
                   <div>
                     <span className="text-slate-500 font-medium">Date:</span>
                     <span className="font-mono text-slate-700 ml-1">{selectedStudentModal.timestamp}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium block text-[10px]">Declared Majors:</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {(selectedStudentModal.majors && selectedStudentModal.majors.length > 0
+                        ? selectedStudentModal.majors
+                        : ['Battling']
+                      ).map((m) => {
+                        const cfg = AVAILABLE_MAJORS.find((opt) => opt.id === m);
+                        return (
+                          <span
+                            key={m}
+                            className={`px-1.5 py-0.2 text-[10px] font-mono font-bold border border-slate-900 ${
+                              cfg?.badgeClass || 'bg-slate-100 text-slate-800'
+                            }`}
+                          >
+                            {cfg?.icon} {m}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
